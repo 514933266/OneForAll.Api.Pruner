@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.1.0" />
+    <PackageReference Include="OneForAll.Core" Version="2.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Dtos\" />
+    <Folder Include="Interfaces\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pruner.Domain\Pruner.Domain.csproj" />
+    <ProjectReference Include="..\Pruner.HttpSevice\Pruner.HttpService.csproj" />
+    <ProjectReference Include="..\Pruner.Public\Pruner.Public.csproj" />
+    <ProjectReference Include="..\Pruner.Repository\Pruner.Repository.csproj" />
+  </ItemGroup>
+
+</Project>
