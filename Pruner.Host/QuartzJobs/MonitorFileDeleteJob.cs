@@ -1,6 +1,7 @@
 ﻿using Pruner.Domain.Interfaces;
 using Pruner.Host.Models;
 using Pruner.HttpService.Interfaces;
+using Pruner.Public.Models;
 using Quartz;
 using System;
 using System.Threading.Tasks;

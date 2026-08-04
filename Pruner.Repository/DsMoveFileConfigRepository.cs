@@ -9,23 +9,23 @@ using System.Threading.Tasks;
 namespace Pruner.Repository
 {
     /// <summary>
-    /// 删除配置仓储
+    /// 文件迁移配置仓储
     /// </summary>
-    public class DsDeleteConfigRepository : Repository<DsDeleteConfig>, IDsDeleteConfigRepository
+    public class DsMoveFileConfigRepository : Repository<DsMoveFileConfig>, IDsMoveFileConfigRepository
     {
-        public DsDeleteConfigRepository(DbContext context)
+        public DsMoveFileConfigRepository(DbContext context)
             : base(context)
         {
         }
 
         /// <summary>
-        /// 分页查询数据库删除配置
+        /// 分页查询文件迁移配置
         /// </summary>
-        public async Task<PageList<DsDeleteConfig>> GetPageListAsync(int pageIndex, int pageSize, string tableName = "")
+        public async Task<PageList<DsMoveFileConfig>> GetPageListAsync(int pageIndex, int pageSize, string key = "")
         {
             var query = DbSet.AsQueryable();
-            if (!string.IsNullOrWhiteSpace(tableName))
-                query = query.Where(e => e.TableName.Contains(tableName));
+            if (!string.IsNullOrWhiteSpace(key))
+                query = query.Where(e => e.SourcePath.Contains(key) || e.TargetPath.Contains(key) || e.ClientCode.Contains(key));
 
             var total = await query.CountAsync();
             var list = await query
@@ -34,7 +34,7 @@ namespace Pruner.Repository
                 .Take(pageSize)
                 .ToListAsync();
 
-            return new PageList<DsDeleteConfig>(total, pageIndex, pageSize, list);
+            return new PageList<DsMoveFileConfig>(total, pageIndex, pageSize, list);
         }
     }
 }

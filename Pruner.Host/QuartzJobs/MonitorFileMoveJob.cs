@@ -9,21 +9,21 @@ using System.Threading.Tasks;
 namespace Pruner.Host.QuartzJobs
 {
     /// <summary>
-    /// 监控数据库数据删除任务
+    /// 监控文件迁移任务
     /// </summary>
     [DisallowConcurrentExecution]
-    public class MonitorDbDeleteJob : IJob
+    public class MonitorFileMoveJob : IJob
     {
-        private readonly AuthConfig _config;
+        private readonly AuthConfig _authConfig;
         private readonly IScheduleJobHttpService _service;
-        private readonly IMonitorDbDeleteManager _manager;
+        private readonly IMonitorFileMoveManager _manager;
 
-        public MonitorDbDeleteJob(
-            AuthConfig config,
+        public MonitorFileMoveJob(
+            AuthConfig authConfig,
             IScheduleJobHttpService service,
-            IMonitorDbDeleteManager manager)
+            IMonitorFileMoveManager manager)
         {
-            _config = config;
+            _authConfig = authConfig;
             _service = service;
             _manager = manager;
         }
@@ -32,12 +32,12 @@ namespace Pruner.Host.QuartzJobs
         {
             try
             {
-                var result = await _manager.HandleDeleteAsync();
-                await AddLogAsync($"数据维护删除任务执行完成，共删除{result}条数据");
+                var result = await _manager.HandleMoveAsync(_authConfig.ClientCode);
+                await AddLogAsync(result);
             }
             catch (Exception ex)
             {
-                await AddLogAsync($"数据维护删除任务执行失败：{ex.Message}\n{ex.StackTrace}", true);
+                await AddLogAsync($"文件迁移任务执行失败：{ex.Message}\n{ex.StackTrace}", true);
             }
         }
 
@@ -46,7 +46,7 @@ namespace Pruner.Host.QuartzJobs
         /// </summary>
         private async Task AddLogAsync(string log, bool isException = false)
         {
-            await _service.LogAsync(_config.ClientCode, typeof(MonitorDbDeleteJob).Name, log, isException);
+            await _service.LogAsync(_authConfig.ClientCode, typeof(MonitorFileMoveJob).Name, log, isException);
         }
     }
 }

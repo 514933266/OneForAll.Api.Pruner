@@ -4,6 +4,7 @@ using System;
 using Pruner.Host.Models;
 using Pruner.HttpService.Interfaces;
 using Pruner.HttpService.Models;
+using Pruner.Public.Models;
 
 namespace Pruner.Host.Filters
 {

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneForAll 数据维护服务管理平台</title>
+  <link rel="stylesheet" href="lib/element-plus.index.css">
+  <style>
+    html, body, #app { height: 100%; margin: 0; font-family: "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif; background: #f0f2f5; }
+    .app-header { background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-shadow: 0 1px 4px rgba(0,21,41,.08); height: 56px; }
+    .app-header .title { font-size: 17px; font-weight: 600; color: #303133; }
+    .app-header .sub { font-size: 12px; color: #909399; margin-left: 10px; }
+    .app-aside { background: #001529; }
+    .app-aside .logo { color: #fff; font-size: 15px; font-weight: 600; text-align: center; padding: 16px 0; letter-spacing: 1px; }
+    .app-aside .el-menu { border-right: none; background: #001529; }
+    .app-aside .el-menu-item { color: #b3b8c2; }
+    .app-aside .el-menu-item:hover { background: #000c17; }
+    .app-aside .el-menu-item.is-active { background: #1890ff; color: #fff; }
+    .app-main { padding: 16px; overflow: auto; }
+    .toolbar { display: flex; gap: 10px; margin-bottom: 14px; }
+    .toolbar .el-input { width: 280px; }
+    .stat-card { text-align: center; }
+    .stat-card .num { font-size: 30px; font-weight: 700; color: #1890ff; }
+    .stat-card .label { color: #909399; margin-top: 6px; font-size: 13px; }
+    .page-title { font-size: 15px; font-weight: 600; color: #303133; margin: 0 0 14px 2px; }
+    .desc-text { white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <el-container style="height:100%">
+    <el-aside width="210px" class="app-aside">
+      <div class="logo">数据维护服务</div>
+      <el-menu :default-active="page" @select="onMenuSelect" background-color="#001529" text-color="#b3b8c2" active-text-color="#fff">
+        <el-menu-item index="dashboard">概览</el-menu-item>
+        <el-menu-item index="global">全局配置</el-menu-item>
+        <el-menu-item index="dbdelete">数据库删除配置</el-menu-item>
+        <el-menu-item index="filedelete">文件删除配置</el-menu-item>
+        <el-menu-item index="filemove">文件迁移配置</el-menu-item>
+        <el-menu-item index="logs">运行日志</el-menu-item>
+        <el-menu-item index="jobs">定时任务</el-menu-item>
+      </el-menu>
+    </el-aside>
+    <el-container>
+      <el-header class="app-header">
+        <div>
+          <span class="title">OneForAll 数据维护服务管理平台</span>
+          <span class="sub">自动数据清理 / 文件清理 / 文件迁移</span>
+        </div>
+        <div>
+          <el-button size="small" @click="refreshAll">刷新数据</el-button>
+        </div>
+      </el-header>
+      <el-main class="app-main">
+        <!-- 概览 -->
+        <div v-if="page === 'dashboard'">
+          <el-row :gutter="14">
+            <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="num">{{ stats.dbDelete }}</div><div class="label">数据库删除配置</div></el-card></el-col>
+            <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="num">{{ stats.fileDelete }}</div><div class="label">文件删除配置</div></el-card></el-col>
+            <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="num">{{ stats.fileMove }}</div><div class="label">文件迁移配置</div></el-card></el-col>
+            <el-col :span="6"><el-card shadow="never" class="stat-card"><div class="num">{{ stats.logs }}</div><div class="label">运行日志</div></el-card></el-col>
+          </el-row>
+          <el-row :gutter="14" style="margin-top:14px">
+            <el-col :span="12">
+              <el-card shadow="never">
+                <template #header>全局服务状态</template>
+                <template v-if="globalConfig">
+                  <el-descriptions :column="1" border size="small">
+                    <el-descriptions-item label="服务总开关">
+                      <el-tag :type="globalConfig.IsEnabled ? 'success' : 'danger'">{{ globalConfig.IsEnabled ? '已启用' : '已停用' }}</el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="数据库删除服务">
+                      <el-tag :type="globalConfig.IsEnabledDel ? 'success' : 'info'">{{ globalConfig.IsEnabledDel ? '已启用' : '已停用' }}</el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="数据同步服务">
+                      <el-tag :type="globalConfig.IsEnabledSync ? 'success' : 'info'">{{ globalConfig.IsEnabledSync ? '已启用' : '已停用' }}</el-tag>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="源数据库">{{ globalConfig.SourceDbName || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="每次最大删除数量">{{ globalConfig.MaxDelCount }}</el-descriptions-item>
+                    <el-descriptions-item label="每次最大同步数量">{{ globalConfig.MaxSyncCount }}</el-descriptions-item>
+                  </el-descriptions>
+                  <el-button type="primary" style="margin-top:12px" @click="page='global'">编辑全局配置</el-button>
+                </template>
+                <el-empty v-else description="暂无全局配置" :image-size="60">
+                  <el-button type="primary" @click="page='global'">立即配置</el-button>
+                </el-empty>
+              </el-card>
+            </el-col>
+            <el-col :span="12">
+              <el-card shadow="never">
+                <template #header>手动执行任务</template>
+                <p class="desc-text" style="color:#909399;font-size:13px">手动触发任务执行，执行结果将实时显示。任务执行耗时取决于数据量大小，请耐心等待。</p>
+                <el-button type="danger" :loading="exec.del" @click="executeTask('/api/Monitor/DbData', '数据库删除')">执行数据库删除</el-button>
+                <el-button type="warning" :loading="exec.fdel" @click="executeTask('/api/Monitor/File/Delete', '文件删除')">执行文件删除</el-button>
+                <el-button type="primary" :loading="exec.move" @click="executeTask('/api/Monitor/File/Move', '文件迁移')">执行文件迁移</el-button>
+              </el-card>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 全局配置 -->
+        <div v-if="page === 'global'">
+          <h3 class="page-title">全局配置</h3>
+          <el-card shadow="never" style="max-width:760px">
+            <el-alert type="info" :closable="false" style="margin-bottom:14px" title="全局配置为服务级参数，SourceConn 为删除/同步数据源连接，TargetConn 为同步目标库连接（可选）。"></el-alert>
+            <el-form :model="globalForm" label-width="160px" style="max-width:640px">
+              <el-form-item label="源数据库名"><el-input v-model="globalForm.SourceDbName" placeholder="如 OneForAll"></el-input></el-form-item>
+              <el-form-item label="每次最大删除数量"><el-input-number v-model="globalForm.MaxDelCount" :min="1"></el-input-number></el-form-item>
+              <el-form-item label="每次最大同步数量"><el-input-number v-model="globalForm.MaxSyncCount" :min="1"></el-input-number></el-form-item>
+              <el-form-item label="源库连接字符串"><el-input v-model="globalForm.SourceConn" type="textarea" :rows="2" placeholder="Data Source=...;Initial Catalog=...;..."></el-input></el-form-item>
+              <el-form-item label="目标库连接字符串"><el-input v-model="globalForm.TargetConn" type="textarea" :rows="2" placeholder="Data Source=...;Initial Catalog=...;..."></el-input></el-form-item>
+              <el-form-item label="启用删除服务"><el-switch v-model="globalForm.IsEnabledDel"></el-switch></el-form-item>
+              <el-form-item label="启用同步服务"><el-switch v-model="globalForm.IsEnabledSync"></el-switch></el-form-item>
+              <el-form-item label="启用本服务"><el-switch v-model="globalForm.IsEnabled"></el-switch></el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="globalSaving" @click="saveGlobal">保存全局配置</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+
+        <!-- 数据库删除配置 -->
+        <div v-if="page === 'dbdelete'">
+          <h3 class="page-title">数据库数据删除配置</h3>
+          <config-page api="DeleteConfigs" placeholder="按表名搜索" :columns="dbDeleteColumns" :fields="dbDeleteFields"></config-page>
+        </div>
+
+        <!-- 文件删除配置 -->
+        <div v-if="page === 'filedelete'">
+          <h3 class="page-title">文件删除配置</h3>
+          <config-page api="DeleteFileConfigs" placeholder="按目录路径或客户端代码搜索" :columns="fileDeleteColumns" :fields="fileDeleteFields"></config-page>
+        </div>
+
+        <!-- 文件迁移配置 -->
+        <div v-if="page === 'filemove'">
+          <h3 class="page-title">文件迁移配置</h3>
+          <config-page api="MoveFileConfigs" placeholder="按目录路径或客户端代码搜索" :columns="fileMoveColumns" :fields="fileMoveFields"></config-page>
+        </div>
+
+        <!-- 运行日志 -->
+        <div v-if="page === 'logs'">
+          <h3 class="page-title">运行日志</h3>
+          <el-card shadow="never">
+            <div class="toolbar">
+              <el-select v-model="logQuery.typeName" placeholder="日志类型" clearable style="width:200px">
+                <el-option label="全部类型" value=""></el-option>
+                <el-option v-for="t in logTypes" :key="t" :label="t" :value="t"></el-option>
+              </el-select>
+              <el-date-picker v-model="logQuery.timeRange" type="datetimerange" range-separator="至" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm:ss" style="width:360px"></el-date-picker>
+              <el-input v-model="logQuery.key" placeholder="表名 / 描述关键字" clearable @keyup.enter="loadLogs" style="width:220px"></el-input>
+              <el-button type="primary" @click="loadLogs">查询</el-button>
+              <el-button @click="resetLogs">重置</el-button>
+              <div style="flex:1"></div>
+              <el-button type="danger" plain @click="clearLogs">清空日志</el-button>
+            </div>
+            <el-table :data="logs" v-loading="logLoading" border stripe size="small">
+              <el-table-column prop="Id" label="ID" width="90"></el-table-column>
+              <el-table-column prop="TypeName" label="日志类型" width="180"></el-table-column>
+              <el-table-column prop="TableName" label="涉及表/目录" width="200" show-overflow-tooltip></el-table-column>
+              <el-table-column prop="Description" label="描述" min-width="260" show-overflow-tooltip></el-table-column>
+              <el-table-column prop="CreateTime" label="创建时间" width="170"></el-table-column>
+              <el-table-column label="操作" width="80">
+                <template #default="{ row }">
+                  <el-button link type="danger" @click="deleteLog(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-pagination style="margin-top:12px" layout="total, sizes, prev, pager, next, jumper"
+              :total="logTotal" v-model:current-page="logQuery.pageIndex" v-model:page-size="logQuery.pageSize"
+              :page-sizes="[10, 20, 50, 100]" @current-change="loadLogs" @size-change="loadLogs"></el-pagination>
+          </el-card>
+        </div>
+
+        <!-- 定时任务 -->
+        <div v-if="page === 'jobs'">
+          <h3 class="page-title">定时任务（appsettings.json 配置）</h3>
+          <el-card shadow="never">
+            <el-table :data="jobs" v-loading="jobLoading" border stripe>
+              <el-table-column prop="TypeName" label="任务名称" width="200"></el-table-column>
+              <el-table-column prop="Cron" label="Cron 表达式" width="160"></el-table-column>
+              <el-table-column prop="Remark" label="说明" min-width="220" show-overflow-tooltip></el-table-column>
+              <el-table-column label="运行状态" width="110">
+                <template #default="{ row }">
+                  <el-tag :type="row.Running ? 'success' : 'info'" size="small">{{ row.Running ? '运行中' : '未启动' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="NextFireTime" label="下次执行时间" width="170">
+                <template #default="{ row }">{{ row.NextFireTime || '-' }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="110">
+                <template #default="{ row }">
+                  <el-button link type="primary" :disabled="!row.Running" @click="triggerJob(row)">立即执行</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </div>
+      </el-main>
+    </el-container>
+  </el-container>
+</div>
+
+<script src="lib/vue.global.prod.js"></script>
+<script src="lib/element-plus.index.full.min.js"></script>
+<script src="lib/element-plus.zh-cn.min.js"></script>
+<script>
+const { createApp, ref, reactive, onMounted } = Vue;
+const ElMessage = ElementPlus.ElMessage;
+const ElMessageBox = ElementPlus.ElMessageBox;
+
+// ---------------- 请求封装 ----------------
+async function request(url, options = {}) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  if (!res.ok) throw new Error('请求失败: HTTP ' + res.status);
+  const data = await res.json();
+  // 后端返回 BaseMessage 错误（Status=false）时统一抛出
+  if (data && data.Status === false) throw new Error(data.Message || '请求失败');
+  return data;
+}
+
+function isOk(res) { return res && res.Status === true; }
+
+// ---------------- 通用配置管理组件 ----------------
+const ConfigPage = {
+  name: 'ConfigPage',
+  props: ['api', 'columns', 'fields', 'placeholder'],
+  template: `
+    <el-card shadow="never">
+      <div class="toolbar">
+        <el-input v-model="state.key" :placeholder="placeholder" clearable @keyup.enter="search" />
+        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+        <div style="flex:1"></div>
+        <el-button type="success" @click="openAdd">新增</el-button>
+      </div>
+      <el-table :data="state.list" v-loading="state.loading" border stripe>
+        <el-table-column v-for="col in columns" :key="col.prop" :label="col.label" :width="col.width" :min-width="col.minWidth" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-switch v-if="col.type === 'switch'" :model-value="row[col.prop]" @change="val => toggleEnabled(row, val)" />
+            <el-tag v-else-if="col.type === 'tag'" :type="row[col.prop] ? 'success' : 'info'" size="small">{{ row[col.prop] ? '是' : '否' }}</el-tag>
+            <span v-else-if="col.type === 'date'">{{ row[col.prop] || '-' }}</span>
+            <span v-else>{{ row[col.prop] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="170">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button link type="danger" @click="del(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination style="margin-top:12px" layout="total, sizes, prev, pager, next, jumper"
+        :total="state.total" v-model:current-page="state.pageIndex" v-model:page-size="state.pageSize"
+        :page-sizes="[10, 20, 50]" @current-change="load" @size-change="load" />
+      <el-dialog v-model="state.dialogVisible" :title="(state.isEdit ? '编辑' : '新增') + '配置'" width="580px">
+        <el-form :model="state.form" label-width="150px">
+          <el-form-item v-for="f in fields" :key="f.prop" :label="f.label" :required="f.required">
+            <el-input v-if="f.type === 'input'" v-model="state.form[f.prop]" :placeholder="'请输入' + f.label" />
+            <el-input-number v-else-if="f.type === 'number'" v-model="state.form[f.prop]" :min="f.min !== undefined ? f.min : 0" :max="f.max" style="width:100%" />
+            <el-switch v-else-if="f.type === 'switch'" v-model="state.form[f.prop]" />
+            <el-date-picker v-else-if="f.type === 'datetime'" v-model="state.form[f.prop]" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择时间" style="width:100%" />
+            <el-input v-else v-model="state.form[f.prop]" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="state.dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="state.saving" @click="save">保存</el-button>
+        </template>
+      </el-dialog>
+    </el-card>
+  `,
+  setup(props) {
+    const state = reactive({
+      list: [], total: 0, pageIndex: 1, pageSize: 10,
+      key: '', loading: false, dialogVisible: false, isEdit: false, form: {}, saving: false
+    });
+
+    const defaultForm = () => {
+      const f = {};
+      props.fields.forEach(field => {
+        if (field.type === 'switch') f[field.prop] = false;
+        else if (field.type === 'number') f[field.prop] = field.default !== undefined ? field.default : 0;
+        else if (field.type === 'datetime') f[field.prop] = null;
+        else f[field.prop] = '';
+      });
+      return f;
+    };
+
+    async function load() {
+      state.loading = true;
+      try {
+        const res = await request(`/api/${props.api}?pageIndex=${state.pageIndex}&pageSize=${state.pageSize}&key=${encodeURIComponent(state.key || '')}`);
+        state.list = res.Items;
+        state.total = res.Total;
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        state.loading = false;
+      }
+    }
+
+    function search() { state.pageIndex = 1; load(); }
+    function reset() { state.key = ''; state.pageIndex = 1; load(); }
+    function openAdd() { state.isEdit = false; state.form = defaultForm(); state.dialogVisible = true; }
+    function openEdit(row) { state.isEdit = true; state.form = { ...row }; state.dialogVisible = true; }
+
+    async function save() {
+      for (const f of props.fields) {
+        if (f.required && (state.form[f.prop] === '' || state.form[f.prop] === null || state.form[f.prop] === undefined)) {
+          ElMessage.warning('请填写' + f.label);
+          return;
+        }
+      }
+      state.saving = true;
+      try {
+        const url = state.isEdit ? `/api/${props.api}/${state.form.Id}` : `/api/${props.api}`;
+        const res = await request(url, { method: state.isEdit ? 'PUT' : 'POST', body: JSON.stringify(state.form) });
+        if (isOk(res)) { ElMessage.success(res.Message); state.dialogVisible = false; load(); }
+        else ElMessage.error(res.Message || '保存失败');
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        state.saving = false;
+      }
+    }
+
+    function del(row) {
+      ElMessageBox.confirm(`确定删除该配置（${row.Id}）吗？`, '删除确认', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+        .then(async () => {
+          const res = await request(`/api/${props.api}/${row.Id}`, { method: 'DELETE' });
+          if (isOk(res)) { ElMessage.success(res.Message); load(); }
+          else ElMessage.error(res.Message || '删除失败');
+        }).catch(() => {});
+    }
+
+    async function toggleEnabled(row, val) {
+      const res = await request(`/api/${props.api}/${row.Id}/Enabled/${val}`, { method: 'PUT' });
+      if (isOk(res)) { row.IsEnabled = val; ElMessage.success(res.Message); }
+      else { ElMessage.error(res.Message || '操作失败'); load(); }
+    }
+
+    onMounted(load);
+    return { state, load, search, reset, openAdd, openEdit, save, del, toggleEnabled };
+  }
+};
+
+// ---------------- 根应用 ----------------
+const app = createApp({
+  setup() {
+    const page = ref('dashboard');
+
+    // 概览统计
+    const stats = reactive({ dbDelete: 0, fileDelete: 0, fileMove: 0, logs: 0 });
+    const globalConfig = ref(null);
+    const exec = reactive({ del: false, fdel: false, move: false });
+
+    // 全局配置
+    const globalForm = reactive({ Id: 0, SourceDbName: '', MaxDelCount: 50, MaxSyncCount: 50, SourceConn: '', TargetConn: '', IsEnabledDel: false, IsEnabledSync: false, IsEnabled: false });
+    const globalSaving = ref(false);
+
+    // 运行日志
+    const logs = ref([]);
+    const logTotal = ref(0);
+    const logLoading = ref(false);
+    const logQuery = reactive({ pageIndex: 1, pageSize: 20, typeName: '', key: '', timeRange: null });
+    const logTypes = ['MonitorDbDeleteJob', 'MonitorFileDeleteJob', 'MonitorFileMoveJob'];
+
+    // 定时任务
+    const jobs = ref([]);
+    const jobLoading = ref(false);
+
+    // 列配置
+    const dbDeleteColumns = [
+      { prop: 'Id', label: 'ID', width: 60 },
+      { prop: 'TableName', label: '表名', minWidth: 140 },
+      { prop: 'KeepDays', label: '保留天数', width: 90 },
+      { prop: 'DateFieldName', label: '时间字段', width: 110 },
+      { prop: 'CustonWhere', label: '自定义条件', minWidth: 120 },
+      { prop: 'KeepId', label: '保留Id', width: 90 },
+      { prop: 'MaxDelCount', label: '最大删除数', width: 100 },
+      { prop: 'LastDelId', label: '最后删除Id', width: 110 },
+      { prop: 'LastDelTime', label: '最后删除时间', width: 165, type: 'date' },
+      { prop: 'WaitingTime', label: '延迟时间', width: 165, type: 'date' },
+      { prop: 'IsEnabled', label: '启用', width: 80, type: 'switch' }
+    ];
+    const dbDeleteFields = [
+      { prop: 'GlobalConfigId', label: '全局配置Id', type: 'number', min: 0, default: 1 },
+      { prop: 'TableName', label: '表名', type: 'input', required: true },
+      { prop: 'KeepDays', label: '数据保留天数', type: 'number', min: 1, default: 120 },
+      { prop: 'DateFieldName', label: '时间字段名', type: 'input', required: true },
+      { prop: 'CustonWhere', label: '自定义删除条件', type: 'input' },
+      { prop: 'KeepId', label: '数据保留Id', type: 'number', min: 0 },
+      { prop: 'MaxDelCount', label: '每次最大删除数量', type: 'number', min: 1, default: 50 },
+      { prop: 'WaitingTime', label: '延迟执行时间', type: 'datetime' },
+      { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
+    ];
+
+    const fileDeleteColumns = [
+      { prop: 'Id', label: 'ID', width: 60 },
+      { prop: 'ClientCode', label: '客户端代码', width: 160 },
+      { prop: 'Path', label: '目录路径', minWidth: 200 },
+      { prop: 'KeepDays', label: '保留天数', width: 90 },
+      { prop: 'MaxDeleteCount', label: '最大删除数', width: 100 },
+      { prop: 'IncludeSubDirectories', label: '递归子目录', width: 100, type: 'tag' },
+      { prop: 'IsEnabled', label: '启用', width: 80, type: 'switch' }
+    ];
+    const fileDeleteFields = [
+      { prop: 'ClientCode', label: '客户端代码', type: 'input', required: true },
+      { prop: 'Path', label: '目录路径', type: 'input', required: true },
+      { prop: 'KeepDays', label: '文件保留天数', type: 'number', min: 1, default: 30 },
+      { prop: 'MaxDeleteCount', label: '每次最大删除数量(0不限制)', type: 'number', min: 0 },
+      { prop: 'IncludeSubDirectories', label: '递归子目录', type: 'switch' },
+      { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
+    ];
+
+    const fileMoveColumns = [
+      { prop: 'Id', label: 'ID', width: 60 },
+      { prop: 'ClientCode', label: '客户端代码', width: 150 },
+      { prop: 'SourcePath', label: '源目录', minWidth: 180 },
+      { prop: 'TargetPath', label: '目标目录', minWidth: 180 },
+      { prop: 'KeepDays', label: '保留天数', width: 90 },
+      { prop: 'MaxMoveCount', label: '最大迁移数', width: 100 },
+      { prop: 'IncludeSubDirectories', label: '递归子目录', width: 100, type: 'tag' },
+      { prop: 'IsEnabled', label: '启用', width: 80, type: 'switch' }
+    ];
+    const fileMoveFields = [
+      { prop: 'ClientCode', label: '客户端代码', type: 'input', required: true },
+      { prop: 'SourcePath', label: '源目录路径', type: 'input', required: true },
+      { prop: 'TargetPath', label: '目标目录路径', type: 'input', required: true },
+      { prop: 'KeepDays', label: '文件保留天数', type: 'number', min: 1, default: 30 },
+      { prop: 'MaxMoveCount', label: '每次最大迁移数量(0不限制)', type: 'number', min: 0 },
+      { prop: 'IncludeSubDirectories', label: '递归子目录', type: 'switch' },
+      { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
+    ];
+
+    // 概览数据
+    async function loadDashboard() {
+      try {
+        const [db, fd, mv, lg, g] = await Promise.all([
+          request('/api/DeleteConfigs?pageIndex=1&pageSize=1'),
+          request('/api/DeleteFileConfigs?pageIndex=1&pageSize=1'),
+          request('/api/MoveFileConfigs?pageIndex=1&pageSize=1'),
+          request('/api/RunningLogs?pageIndex=1&pageSize=1'),
+          request('/api/GlobalConfigs')
+        ]);
+        stats.dbDelete = db.Total;
+        stats.fileDelete = fd.Total;
+        stats.fileMove = mv.Total;
+        stats.logs = lg.Total;
+        if (g && g.length > 0) {
+          globalConfig.value = g[0];
+          Object.assign(globalForm, g[0]);
+        }
+      } catch (e) {
+        ElMessage.error(e.message);
+      }
+    }
+
+    // 全局配置保存
+    async function saveGlobal() {
+      globalSaving.value = true;
+      try {
+        const body = JSON.stringify(globalForm);
+        const res = globalForm.Id > 0
+          ? await request(`/api/GlobalConfigs/${globalForm.Id}`, { method: 'PUT', body })
+          : await request('/api/GlobalConfigs', { method: 'POST', body });
+        if (isOk(res)) {
+          ElMessage.success(res.Message);
+          globalConfig.value = res.Data;
+          loadDashboard();
+        } else {
+          ElMessage.error(res.Message || '保存失败');
+        }
+      } finally {
+        globalSaving.value = false;
+      }
+    }
+
+    // 手动执行任务
+    async function executeTask(url, name) {
+      const key = url.includes('DbData') ? 'del' : url.includes('File/Delete') ? 'fdel' : 'move';
+      exec[key] = true;
+      try {
+        const res = await request(url, { method: 'POST' });
+        if (isOk(res)) {
+          ElMessageBox.alert(res.Message || '执行完成', `${name}执行结果`, { confirmButtonText: '知道了', customClass: 'desc-text', dangerouslyUseHTMLString: false });
+        } else {
+          ElMessage.error(res.Message || '执行失败');
+        }
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        exec[key] = false;
+      }
+    }
+
+    // 运行日志
+    async function loadLogs() {
+      logLoading.value = true;
+      try {
+        const params = new URLSearchParams({
+          pageIndex: logQuery.pageIndex, pageSize: logQuery.pageSize,
+          typeName: logQuery.typeName || '', key: logQuery.key || ''
+        });
+        if (logQuery.timeRange && logQuery.timeRange.length === 2) {
+          params.append('startTime', logQuery.timeRange[0]);
+          params.append('endTime', logQuery.timeRange[1]);
+        }
+        const res = await request('/api/RunningLogs?' + params.toString());
+        logs.value = res.Items;
+        logTotal.value = res.Total;
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        logLoading.value = false;
+      }
+    }
+
+    function resetLogs() {
+      Object.assign(logQuery, { pageIndex: 1, pageSize: 20, typeName: '', key: '', timeRange: null });
+      loadLogs();
+    }
+
+    function deleteLog(row) {
+      ElMessageBox.confirm('确定删除该日志吗？', '删除确认', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+        .then(async () => {
+          const res = await request(`/api/RunningLogs/${row.Id}`, { method: 'DELETE' });
+          if (isOk(res)) { ElMessage.success(res.Message); loadLogs(); }
+          else ElMessage.error(res.Message || '删除失败');
+        }).catch(() => {});
+    }
+
+    function clearLogs() {
+      ElMessageBox.confirm('确定清空全部运行日志吗？该操作不可恢复！', '清空确认', { type: 'error', confirmButtonText: '清空', cancelButtonText: '取消' })
+        .then(async () => {
+          const res = await request('/api/RunningLogs', { method: 'DELETE' });
+          if (isOk(res)) { ElMessage.success(res.Message); loadLogs(); }
+          else ElMessage.error(res.Message || '清空失败');
+        }).catch(() => {});
+    }
+
+    // 定时任务
+    async function loadJobs() {
+      jobLoading.value = true;
+      try {
+        jobs.value = await request('/api/Jobs');
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        jobLoading.value = false;
+      }
+    }
+
+    function triggerJob(row) {
+      ElMessageBox.confirm(`确定立即执行任务【${row.TypeName}】吗？`, '触发确认', { type: 'warning', confirmButtonText: '执行', cancelButtonText: '取消' })
+        .then(async () => {
+          const res = await request(`/api/Jobs/${row.TypeName}/Trigger`, { method: 'POST' });
+          if (isOk(res)) ElMessage.success(res.Message);
+          else ElMessage.error(res.Message || '触发失败');
+        }).catch(() => {});
+    }
+
+    function refreshAll() {
+      loadDashboard();
+      if (page.value === 'logs') loadLogs();
+      if (page.value === 'jobs') loadJobs();
+      ElMessage.success('数据已刷新');
+    }
+
+    // 菜单切换页面时加载对应数据
+    function onMenuSelect(p) {
+      page.value = p;
+      if (p === 'logs') loadLogs();
+      else if (p === 'jobs') loadJobs();
+    }
+
+    onMounted(() => { loadDashboard(); });
+
+    return {
+      page, stats, globalConfig, exec, globalForm, globalSaving,
+      logs, logTotal, logLoading, logQuery, logTypes,
+      jobs, jobLoading,
+      dbDeleteColumns, dbDeleteFields,
+      fileDeleteColumns, fileDeleteFields,
+      fileMoveColumns, fileMoveFields,
+      saveGlobal, executeTask, loadLogs, resetLogs, deleteLog, clearLogs, loadJobs, triggerJob, refreshAll, onMenuSelect
+    };
+  }
+});
+
+app.component('config-page', ConfigPage);
+app.use(ElementPlus, { locale: ElementPlusLocaleZhCn });
+app.mount('#app');
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Autofac.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -130,6 +130,8 @@ namespace Pruner.Host
 
             // 将 HttpServiceConfig 作为单例注入，供后续使用
             services.AddSingleton<HttpServiceConfig>();
+            // 将 HttpServiceLogConfig 作为单例注入
+            services.AddSingleton<HttpServiceLogConfig>();
 
             #endregion
 
@@ -264,6 +266,9 @@ namespace Pruner.Host
 
             // 启用默认文件支持（例如访问目录时自动查找 index.html 等默认页）
             app.UseDefaultFiles();
+
+            // 启用默认静态文件服务（wwwroot 目录，用于承载管理界面）
+            app.UseStaticFiles();
 
             // 启用路由中间件，为后续的端点映射做准备
             app.UseRouting();

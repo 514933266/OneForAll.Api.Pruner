@@ -5,6 +5,7 @@ using OneForAll.Core.Extension;
 using Pruner.Host.Models;
 using Pruner.HttpService.Interfaces;
 using Pruner.HttpService.Models;
+using Pruner.Public.Models;
 using Quartz;
 using Quartz.Spi;
 using System;

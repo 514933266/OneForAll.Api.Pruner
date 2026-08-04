@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace Pruner.Host.Models
+namespace Pruner.Public.Models
 {
     /// <summary>
     /// OAuth授权配置

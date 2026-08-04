@@ -1,0 +1,108 @@
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using OneForAll.Core;
+using Pruner.Domain.Entities;
+using Pruner.Domain.Models;
+using Pruner.Domain.Repositorys;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Pruner.Host.Controllers
+{
+    /// <summary>
+    /// 全局配置管理
+    /// </summary>
+    [Route("api/[controller]")]
+    [ApiController]
+    [AllowAnonymous]
+    public class GlobalConfigsController : Controller
+    {
+        private readonly IDsGlobalConfigRepository _repository;
+        private readonly IMapper _mapper;
+
+        public GlobalConfigsController(IDsGlobalConfigRepository repository, IMapper mapper)
+        {
+            _repository = repository;
+            _mapper = mapper;
+        }
+
+        /// <summary>
+        /// 获取全局配置列表
+        /// </summary>
+        [HttpGet]
+        public async Task<List<DsGlobalConfig>> GetListAsync()
+        {
+            return (await _repository.GetListAsync()).ToList();
+        }
+
+        /// <summary>
+        /// 获取全局配置详情
+        /// </summary>
+        [HttpGet("{id}")]
+        public async Task<DsGlobalConfig> GetAsync(int id)
+        {
+            return await _repository.FindAsync(id);
+        }
+
+        /// <summary>
+        /// 新增全局配置
+        /// </summary>
+        [HttpPost]
+        public async Task<BaseMessage> AddAsync([FromBody] DsGlobalConfigForm form)
+        {
+            var msg = new BaseMessage();
+            if (form == null)
+                return msg.Fail(BaseErrType.InvalidParameter, "参数不能为空");
+
+            var entity = _mapper.Map<DsGlobalConfig>(form);
+            entity.Id = 0;
+            var count = await _repository.AddAsync(entity);
+            if (count > 0)
+                return BaseMessage.Success("新增成功", entity);
+
+            return msg.Fail("新增失败");
+        }
+
+        /// <summary>
+        /// 修改全局配置
+        /// </summary>
+        [HttpPut("{id}")]
+        public async Task<BaseMessage> UpdateAsync(int id, [FromBody] DsGlobalConfigForm form)
+        {
+            var msg = new BaseMessage();
+            if (form == null || form.Id != id)
+                return msg.Fail(BaseErrType.InvalidParameter, "参数无效");
+
+            var exists = await _repository.FindAsync(id);
+            if (exists == null)
+                return msg.Fail(BaseErrType.DataNotFound, "全局配置不存在");
+
+            _mapper.Map(form, exists);
+            var count = await _repository.UpdateAsync(exists);
+            if (count > 0)
+                return BaseMessage.Success("修改成功", exists);
+
+            return msg.Fail("修改失败");
+        }
+
+        /// <summary>
+        /// 删除全局配置
+        /// </summary>
+        [HttpDelete("{id}")]
+        public async Task<BaseMessage> DeleteAsync(int id)
+        {
+            var msg = new BaseMessage();
+            var entity = await _repository.FindAsync(id);
+            if (entity == null)
+                return msg.Fail(BaseErrType.DataNotFound, "全局配置不存在");
+
+            var count = await _repository.DeleteAsync(entity);
+            if (count > 0)
+                return msg.Success("删除成功");
+
+            return msg.Fail("删除失败");
+        }
+    }
+}

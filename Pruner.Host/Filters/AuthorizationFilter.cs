@@ -11,6 +11,7 @@ using OneForAll.Core;
 using OneForAll.Core.Extension;
 using Pruner.HttpService.Interfaces;
 using Pruner.Host.Models;
+using Pruner.Public.Models;
 using OneForAll.Core.Security;
 
 namespace Pruner.Host.Filters

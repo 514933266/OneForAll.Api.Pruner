@@ -6,17 +6,17 @@ using System.Threading.Tasks;
 namespace Pruner.Domain.Repositorys
 {
     /// <summary>
-    /// 删除配置仓储
+    /// 文件迁移配置仓储
     /// </summary>
-    public interface IDsDeleteConfigRepository : IEFCoreRepository<DsDeleteConfig>
+    public interface IDsMoveFileConfigRepository : IEFCoreRepository<DsMoveFileConfig>
     {
         /// <summary>
-        /// 分页查询数据库删除配置
+        /// 分页查询文件迁移配置
         /// </summary>
         /// <param name="pageIndex">页码（从1开始）</param>
         /// <param name="pageSize">每页数量</param>
-        /// <param name="tableName">表名关键字</param>
+        /// <param name="key">关键字（源/目标目录路径、客户端代码）</param>
         /// <returns>分页结果</returns>
-        Task<PageList<DsDeleteConfig>> GetPageListAsync(int pageIndex, int pageSize, string tableName = "");
+        Task<PageList<DsMoveFileConfig>> GetPageListAsync(int pageIndex, int pageSize, string key = "");
     }
 }

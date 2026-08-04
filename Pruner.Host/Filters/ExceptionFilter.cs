@@ -10,6 +10,7 @@ using OneForAll.Core.Extension;
 using Pruner.HttpService.Interfaces;
 using Pruner.HttpService.Models;
 using Pruner.Host.Models;
+using Pruner.Public.Models;
 
 namespace Pruner.Host.Filters
 {

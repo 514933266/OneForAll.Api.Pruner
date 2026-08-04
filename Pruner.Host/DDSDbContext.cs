@@ -42,6 +42,13 @@ namespace Pruner.Host
 
                 entity.Property(e => e.Id).ValueGeneratedOnAdd();
             });
+
+            modelBuilder.Entity<DsMoveFileConfig>(entity =>
+            {
+                entity.ToTable("ds_move_file_config");
+
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            });
         }
     }
 }
