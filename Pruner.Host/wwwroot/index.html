@@ -10,11 +10,11 @@
     .app-header { background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-shadow: 0 1px 4px rgba(0,21,41,.08); height: 56px; }
     .app-header .title { font-size: 17px; font-weight: 600; color: #303133; }
     .app-header .sub { font-size: 12px; color: #909399; margin-left: 10px; }
-    .app-aside { background: #001529; }
+    .app-aside { background: #2d2f33; }
     .app-aside .logo { color: #fff; font-size: 15px; font-weight: 600; text-align: center; padding: 16px 0; letter-spacing: 1px; }
-    .app-aside .el-menu { border-right: none; background: #001529; }
+    .app-aside .el-menu { border-right: none; background: #2d2f33; }
     .app-aside .el-menu-item { color: #b3b8c2; }
-    .app-aside .el-menu-item:hover { background: #000c17; }
+    .app-aside .el-menu-item:hover { background: #3a3d42; }
     .app-aside .el-menu-item.is-active { background: #1890ff; color: #fff; }
     .app-main { padding: 16px; overflow: auto; }
     .toolbar { display: flex; gap: 10px; margin-bottom: 14px; }
@@ -31,7 +31,7 @@
   <el-container style="height:100%">
     <el-aside width="210px" class="app-aside">
       <div class="logo">数据维护服务</div>
-      <el-menu :default-active="page" @select="onMenuSelect" background-color="#001529" text-color="#b3b8c2" active-text-color="#fff">
+      <el-menu :default-active="page" @select="onMenuSelect" background-color="#2d2f33" text-color="#b3b8c2" active-text-color="#fff">
         <el-menu-item index="dashboard">概览</el-menu-item>
         <el-menu-item index="global">全局配置</el-menu-item>
         <el-menu-item index="dbdelete">数据库删除配置</el-menu-item>
