@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OneForAll 数据维护服务管理平台</title>
+  <title>数据维护服务</title>
   <link rel="stylesheet" href="lib/element-plus.index.css">
   <style>
     html, body, #app { height: 100%; margin: 0; font-family: "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif; background: #f0f2f5; }
@@ -24,6 +24,8 @@
     .stat-card .label { color: #909399; margin-top: 6px; font-size: 13px; }
     .page-title { font-size: 15px; font-weight: 600; color: #303133; margin: 0 0 14px 2px; }
     .desc-text { white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
+    .field-tip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 4px; border-radius: 50%; background: #c0c4cc; color: #fff; font-size: 11px; cursor: help; vertical-align: middle; }
+    .field-tip:hover { background: #909399; }
   </style>
 </head>
 <body>
@@ -44,7 +46,6 @@
     <el-container>
       <el-header class="app-header">
         <div>
-          <span class="title">OneForAll 数据维护服务管理平台</span>
           <span class="sub">自动数据清理 / 文件清理 / 文件迁移</span>
         </div>
         <div>
@@ -238,6 +239,12 @@ const ConfigPage = {
       </div>
       <el-table :data="state.list" v-loading="state.loading" border stripe>
         <el-table-column v-for="col in columns" :key="col.prop" :label="col.label" :width="col.width" :min-width="col.minWidth" show-overflow-tooltip>
+          <template #header v-if="col.tooltip">
+            <span>{{ col.label }}</span>
+            <el-tooltip :content="col.tooltip" placement="top">
+              <span class="field-tip">?</span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
             <el-switch v-if="col.type === 'switch'" :model-value="row[col.prop]" @change="val => toggleEnabled(row, val)" />
             <el-tag v-else-if="col.type === 'tag'" :type="row[col.prop] ? 'success' : 'info'" size="small">{{ row[col.prop] ? '是' : '否' }}</el-tag>
@@ -257,7 +264,13 @@ const ConfigPage = {
         :page-sizes="[10, 20, 50]" @current-change="load" @size-change="load" />
       <el-dialog v-model="state.dialogVisible" :title="(state.isEdit ? '编辑' : '新增') + '配置'" width="580px">
         <el-form :model="state.form" label-width="150px">
-          <el-form-item v-for="f in fields" :key="f.prop" :label="f.label" :required="f.required">
+          <el-form-item v-for="f in fields" :key="f.prop" :required="f.required">
+            <template #label>
+              <span>{{ f.label }}</span>
+              <el-tooltip v-if="f.tooltip" :content="f.tooltip" placement="top">
+                <span class="field-tip">?</span>
+              </el-tooltip>
+            </template>
             <el-input v-if="f.type === 'input'" v-model="state.form[f.prop]" :placeholder="'请输入' + f.label" />
             <el-input-number v-else-if="f.type === 'number'" v-model="state.form[f.prop]" :min="f.min !== undefined ? f.min : 0" :max="f.max" style="width:100%" />
             <el-switch v-else-if="f.type === 'switch'" v-model="state.form[f.prop]" />
@@ -403,7 +416,7 @@ const app = createApp({
       { prop: 'ClientCode', label: '客户端代码', width: 160 },
       { prop: 'Path', label: '目录路径', minWidth: 200 },
       { prop: 'KeepDays', label: '保留天数', width: 90 },
-      { prop: 'MaxDeleteCount', label: '最大删除数', width: 100 },
+      { prop: 'MaxDeleteCount', label: '最大删除数', width: 110, tooltip: '0 表示不限制删除数量，文件将分批删除' },
       { prop: 'IncludeSubDirectories', label: '递归子目录', width: 100, type: 'tag' },
       { prop: 'IsEnabled', label: '启用', width: 80, type: 'switch' }
     ];
@@ -411,7 +424,7 @@ const app = createApp({
       { prop: 'ClientCode', label: '客户端代码', type: 'input', required: true },
       { prop: 'Path', label: '目录路径', type: 'input', required: true },
       { prop: 'KeepDays', label: '文件保留天数', type: 'number', min: 1, default: 30 },
-      { prop: 'MaxDeleteCount', label: '每次最大删除数量(0不限制)', type: 'number', min: 0 },
+      { prop: 'MaxDeleteCount', label: '每次最大删除数量(0不限制)', type: 'number', min: 0, tooltip: '0 表示不限制删除数量，文件将按批次分批删除' },
       { prop: 'IncludeSubDirectories', label: '递归子目录', type: 'switch' },
       { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
     ];
@@ -422,8 +435,8 @@ const app = createApp({
       { prop: 'SourcePath', label: '源目录', minWidth: 180 },
       { prop: 'TargetPath', label: '目标目录', minWidth: 180 },
       { prop: 'KeepDays', label: '保留天数', width: 90 },
-      { prop: 'MaxMoveCount', label: '最大迁移数', width: 100 },
-      { prop: 'IncludeSubDirectories', label: '递归子目录', width: 100, type: 'tag' },
+      { prop: 'MaxMoveCount', label: '最大迁移数', width: 110, tooltip: '0 表示不限制迁移数量，文件将分批迁移' },
+      { prop: 'IncludeSubDirectories', label: '递归迁移', width: 100, type: 'tag' },
       { prop: 'IsEnabled', label: '启用', width: 80, type: 'switch' }
     ];
     const fileMoveFields = [
@@ -431,8 +444,8 @@ const app = createApp({
       { prop: 'SourcePath', label: '源目录路径', type: 'input', required: true },
       { prop: 'TargetPath', label: '目标目录路径', type: 'input', required: true },
       { prop: 'KeepDays', label: '文件保留天数', type: 'number', min: 1, default: 30 },
-      { prop: 'MaxMoveCount', label: '每次最大迁移数量(0不限制)', type: 'number', min: 0 },
-      { prop: 'IncludeSubDirectories', label: '递归子目录', type: 'switch' },
+      { prop: 'MaxMoveCount', label: '每次最大迁移数量(0不限制)', type: 'number', min: 0, tooltip: '0 表示不限制迁移数量，文件将按批次分批迁移' },
+      { prop: 'IncludeSubDirectories', label: '递归迁移', type: 'switch', tooltip: '递归迁移时，会按照原文件所在目录层级迁移' },
       { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
     ];
 

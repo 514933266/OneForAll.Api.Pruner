@@ -20,6 +20,11 @@ namespace Pruner.Domain
         private readonly IDsMoveFileConfigRepository _configRepository;
         private readonly IDsRunningLogRepository _runningLogRepository;
 
+        /// <summary>
+        /// 单批迁移的文件数量，控制迁移过程中的内存占用
+        /// </summary>
+        private const int BatchSize = 1000;
+
         public MonitorFileMoveManager(
             IHttpContextAccessor httpContextAccessor,
             IDsMoveFileConfigRepository configRepository,
@@ -93,6 +98,11 @@ namespace Pruner.Domain
         /// <summary>
         /// 迁移指定目录下的过期文件
         /// </summary>
+        /// <param name="sourcePath">源目录路径</param>
+        /// <param name="targetPath">目标目录路径</param>
+        /// <param name="keepDays">文件保留天数</param>
+        /// <param name="maxMoveCount">每次最大迁移数量（0表示不限制）</param>
+        /// <param name="includeSubDirs">是否递归迁移（递归迁移时，会按照原文件所在目录层级迁移）</param>
         /// <returns>(成功迁移数, 失败数, 警告信息)</returns>
         private (int moved, int failed, string warning) MoveExpiredFiles(string sourcePath, string targetPath, int keepDays, int maxMoveCount, bool includeSubDirs)
         {
@@ -115,55 +125,130 @@ namespace Pruner.Domain
             var cutoffDate = DateTime.Now.AddDays(-keepDays);
             var moved = 0;
             var failed = 0;
+            var unlimited = maxMoveCount <= 0;
+            var remaining = maxMoveCount;
 
-            // 使用 EnumerationOptions 跳过无权限的子目录，避免枚举中断
-            var enumOptions = new EnumerationOptions
+            // 已确认存在的目标子目录缓存，避免每个文件迁移前都重复检查目标目录
+            var ensuredDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            ensuredDirs.Add(Path.GetFullPath(targetPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+            // 待处理目录：源根目录自身 + 递归子目录（仅目录路径，量级远小于文件数量）
+            var dirsToProcess = new List<string> { sourcePath };
+            if (includeSubDirs)
             {
-                RecurseSubdirectories = includeSubDirs,
-                IgnoreInaccessible = true
-            };
+                try
+                {
+                    var enumOptions = new EnumerationOptions
+                    {
+                        RecurseSubdirectories = true,
+                        IgnoreInaccessible = true
+                    };
+                    dirsToProcess.AddRange(Directory.EnumerateDirectories(sourcePath, "*", enumOptions));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (0, 0, "无目录访问权限，跳过执行");
+                }
+            }
 
-            IEnumerable<string> files;
+            foreach (var dirPath in dirsToProcess)
+            {
+                // 剩余额度耗尽，任务完成
+                if (!unlimited && remaining <= 0)
+                    break;
+
+                // 处理单个目录：若该目录过期文件数超过剩余额度，则只迁移剩余额度个并结束任务；
+                // 若不超过，则全部迁移后继续下一个目录（递归时进入下一层级子目录）
+                var (dirMoved, dirFailed, accessible) = MoveExpiredFilesInDir(dirPath, cutoffDate, unlimited ? 0 : remaining, sourcePath, targetPath, includeSubDirs, ensuredDirs);
+                if (!accessible && dirPath == sourcePath)
+                    return (0, 0, "无目录访问权限，跳过执行");
+                moved += dirMoved;
+                failed += dirFailed;
+
+                // 尝试处理的文件数消耗额度（与 Take 截断候选语义一致，迁移失败也算消耗）
+                if (!unlimited)
+                    remaining -= dirMoved + dirFailed;
+            }
+
+            return (moved, failed, null);
+        }
+
+        /// <summary>
+        /// 迁移单个目录下的过期文件
+        /// </summary>
+        /// <param name="dirPath">源目录路径</param>
+        /// <param name="cutoffDate">过期时间界限</param>
+        /// <param name="maxCount">该目录最多迁移数量（0表示不限制）</param>
+        /// <param name="sourcePath">源根目录路径（递归迁移时用于计算相对层级）</param>
+        /// <param name="targetPath">目标目录路径</param>
+        /// <param name="includeSubDirs">是否递归迁移</param>
+        /// <param name="ensuredDirs">已确认存在的目标子目录缓存</param>
+        /// <returns>(成功迁移数, 失败数, 是否成功访问该目录)</returns>
+        private (int moved, int failed, bool accessible) MoveExpiredFilesInDir(string dirPath, DateTime cutoffDate, int maxCount, string sourcePath, string targetPath, bool includeSubDirs, HashSet<string> ensuredDirs)
+        {
+            var moved = 0;
+            var failed = 0;
+            var unlimited = maxCount <= 0;
+
             try
             {
-                files = Directory.EnumerateFiles(sourcePath, "*", enumOptions);
+                // EnumerateFiles 枚举时即带回文件时间，无需再逐文件调用 GetLastWriteTime；
+                // 小批量物化后迁移，避免文件过多时一次性加载全部路径占用大量内存
+                var batch = new List<FileInfo>(BatchSize);
+                foreach (var fileInfo in new DirectoryInfo(dirPath).EnumerateFiles())
+                {
+                    // 达到该目录的最大迁移数量后停止（含已加入批次尚未迁移的文件）
+                    if (!unlimited && moved + failed + batch.Count >= maxCount)
+                        break;
+                    if (fileInfo.LastWriteTime >= cutoffDate)
+                        continue;
+
+                    batch.Add(fileInfo);
+                    if (batch.Count >= BatchSize)
+                    {
+                        MoveBatch(batch, sourcePath, targetPath, includeSubDirs, ensuredDirs, ref moved, ref failed);
+                        batch.Clear();
+                    }
+                }
+                if (batch.Count > 0)
+                    MoveBatch(batch, sourcePath, targetPath, includeSubDirs, ensuredDirs, ref moved, ref failed);
+                return (moved, failed, true);
             }
             catch (UnauthorizedAccessException)
             {
-                return (0, 0, "无目录访问权限，跳过执行");
+                // 目录无权限时跳过，不影响其他目录处理
+                return (moved, failed, false);
             }
+        }
 
-            // 过滤过期文件，安全获取文件时间以防权限问题
-            var candidates = files.Where(f =>
+        /// <summary>
+        /// 批量迁移文件
+        /// </summary>
+        private void MoveBatch(List<FileInfo> batch, string sourcePath, string targetPath, bool includeSubDirs, HashSet<string> ensuredDirs, ref int moved, ref int failed)
+        {
+            foreach (var fileInfo in batch)
             {
                 try
                 {
-                    return File.GetLastWriteTime(f) < cutoffDate;
-                }
-                catch
-                {
-                    return false;
-                }
-            }).ToList();
-
-            // 限制最大读取数量，避免文件过多时占用大量内存
-            if (maxMoveCount > 0)
-                candidates = candidates.Take(maxMoveCount).ToList();
-
-            foreach (var filePath in candidates)
-            {
-                try
-                {
-                    var fileName = Path.GetFileName(filePath);
-                    var destPath = Path.Combine(targetPath, fileName);
-
-                    // 如果目标文件已存在，先删除目标文件
-                    if (File.Exists(destPath))
+                    string destPath;
+                    if (includeSubDirs)
                     {
-                        File.Delete(destPath);
+                        // 递归迁移：按原文件相对源目录的层级迁移，并确保目标子目录存在
+                        destPath = Path.Combine(targetPath, Path.GetRelativePath(sourcePath, fileInfo.FullName));
+                        var destDir = Path.GetDirectoryName(destPath);
+                        if (!string.IsNullOrEmpty(destDir) && !ensuredDirs.Contains(destDir))
+                        {
+                            Directory.CreateDirectory(destDir);
+                            ensuredDirs.Add(destDir);
+                        }
+                    }
+                    else
+                    {
+                        destPath = Path.Combine(targetPath, fileInfo.Name);
                     }
 
-                    File.Move(filePath, destPath);
+                    // 目标文件已存在时直接覆盖，避免先查再删的额外系统调用
+                    File.Move(fileInfo.FullName, destPath, true);
                     moved++;
                 }
                 catch
@@ -171,8 +256,6 @@ namespace Pruner.Domain
                     failed++;
                 }
             }
-
-            return (moved, failed, null);
         }
     }
 }

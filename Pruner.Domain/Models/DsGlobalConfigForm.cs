@@ -41,7 +41,6 @@ namespace Pruner.Domain.Models
         /// <summary>
         /// 目标库连接字符串
         /// </summary>
-        [Required]
         [StringLength(500)]
         public string TargetConn { get; set; } = "";
 

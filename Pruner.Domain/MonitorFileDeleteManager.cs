@@ -20,6 +20,11 @@ namespace Pruner.Domain
         private readonly IDsDeleteFileConfigRepository _configRepository;
         private readonly IDsRunningLogRepository _runningLogRepository;
 
+        /// <summary>
+        /// 单批删除的文件数量，控制删除过程中的内存占用
+        /// </summary>
+        private const int BatchSize = 1000;
+
         public MonitorFileDeleteManager(
             IHttpContextAccessor httpContextAccessor,
             IDsDeleteFileConfigRepository configRepository,
@@ -109,78 +114,140 @@ namespace Pruner.Domain
             var cutoffDate = DateTime.Now.AddDays(-keepDays);
             var deleted = 0;
             var failed = 0;
+            var removedDirs = 0;
+            var unlimited = maxDeleteCount <= 0;
+            var remaining = maxDeleteCount;
 
-            // 使用 EnumerationOptions 跳过无权限的子目录，避免枚举中断
-            var enumOptions = new EnumerationOptions
+            // 待检查的空目录集合：删除文件后延迟统一清理，避免每个文件删除后都枚举一次父目录
+            var pendingDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // 待处理目录：根目录自身 + 递归子目录（仅目录路径，量级远小于文件数量）
+            var dirsToProcess = new List<string> { path };
+            if (includeSubDirs)
             {
-                RecurseSubdirectories = includeSubDirs,
-                IgnoreInaccessible = true
-            };
+                try
+                {
+                    var enumOptions = new EnumerationOptions
+                    {
+                        RecurseSubdirectories = true,
+                        IgnoreInaccessible = true
+                    };
+                    dirsToProcess.AddRange(Directory.EnumerateDirectories(path, "*", enumOptions));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (0, 0, 0, "无目录访问权限，跳过执行");
+                }
+            }
 
-            IEnumerable<string> files;
+            foreach (var dirPath in dirsToProcess)
+            {
+                // 剩余额度耗尽，任务完成
+                if (!unlimited && remaining <= 0)
+                    break;
+
+                // 处理单个目录：若该目录过期文件数超过剩余额度，则只删除剩余额度个并结束任务；
+                // 若不超过，则全部删除后继续下一个目录（递归时进入下一层级子目录）
+                var (dirDeleted, dirFailed, accessible) = DeleteExpiredFilesInDir(dirPath, cutoffDate, unlimited ? 0 : remaining, pendingDirs);
+                if (!accessible && dirPath == path)
+                    return (0, 0, 0, "无目录访问权限，跳过执行");
+                deleted += dirDeleted;
+                failed += dirFailed;
+
+                // 尝试处理的文件数消耗额度（与 Take 截断候选语义一致，删除失败也算消耗）
+                if (!unlimited)
+                    remaining -= dirDeleted + dirFailed;
+            }
+
+            // 统一清理删除后变空的目录（按深度从深到浅，可顺带向上清理；不删除配置根目录）
+            var rootPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (var dirPath in pendingDirs
+                .Where(d => !string.Equals(Path.GetFullPath(d).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), rootPath, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(d => d.Count(c => c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar)))
+            {
+                if (IsDirectoryEmpty(dirPath))
+                {
+                    try
+                    {
+                        Directory.Delete(dirPath, false);
+                        removedDirs++;
+                    }
+                    catch
+                    {
+                        // 空目录删除失败不影响文件删除结果
+                    }
+                }
+            }
+
+            return (deleted, failed, removedDirs, null);
+        }
+
+        /// <summary>
+        /// 删除单个目录下的过期文件
+        /// </summary>
+        /// <param name="dirPath">目录路径</param>
+        /// <param name="cutoffDate">过期时间界限</param>
+        /// <param name="maxCount">该目录最多删除数量（0表示不限制）</param>
+        /// <param name="pendingDirs">待检查的空目录集合</param>
+        /// <returns>(成功删除数, 失败数, 是否成功访问该目录)</returns>
+        private (int deleted, int failed, bool accessible) DeleteExpiredFilesInDir(string dirPath, DateTime cutoffDate, int maxCount, HashSet<string> pendingDirs)
+        {
+            var deleted = 0;
+            var failed = 0;
+            var unlimited = maxCount <= 0;
+
             try
             {
-                files = Directory.EnumerateFiles(path, "*", enumOptions);
+                // EnumerateFiles 枚举时即带回文件时间，无需再逐文件调用 GetLastWriteTime；
+                // 小批量物化后删除，避免文件过多时一次性加载全部路径占用大量内存
+                var batch = new List<FileInfo>(BatchSize);
+                foreach (var fileInfo in new DirectoryInfo(dirPath).EnumerateFiles())
+                {
+                    // 达到该目录的最大删除数量后停止（含已加入批次尚未删除的文件）
+                    if (!unlimited && deleted + failed + batch.Count >= maxCount)
+                        break;
+                    if (fileInfo.LastWriteTime >= cutoffDate)
+                        continue;
+
+                    batch.Add(fileInfo);
+                    if (batch.Count >= BatchSize)
+                    {
+                        DeleteBatch(batch, pendingDirs, ref deleted, ref failed);
+                        batch.Clear();
+                    }
+                }
+                if (batch.Count > 0)
+                    DeleteBatch(batch, pendingDirs, ref deleted, ref failed);
+                return (deleted, failed, true);
             }
             catch (UnauthorizedAccessException)
             {
-                return (0, 0, 0, "无目录访问权限，跳过执行");
+                // 目录无权限时跳过，不影响其他目录处理
+                return (deleted, failed, false);
             }
+        }
 
-            // 过滤过期文件，安全获取文件时间以防权限问题
-            var candidates = files.Where(f =>
+        /// <summary>
+        /// 批量删除文件，并记录文件所在目录供最后统一检查空目录
+        /// </summary>
+        private void DeleteBatch(List<FileInfo> batch, HashSet<string> pendingDirs, ref int deleted, ref int failed)
+        {
+            foreach (var fileInfo in batch)
             {
                 try
                 {
-                    return File.GetLastWriteTime(f) < cutoffDate;
-                }
-                catch
-                {
-                    return false;
-                }
-            });
-
-            // 限制最大读取数量，避免文件过多时占用大量内存
-            if (maxDeleteCount > 0)
-                candidates = candidates.Take(maxDeleteCount);
-
-            // 先物化候选列表，避免删除文件/目录时枚举器失效
-            var candidateList = candidates.ToList();
-
-            var rootPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var removedDirs = 0;
-
-            foreach (var filePath in candidateList)
-            {
-                try
-                {
-                    File.Delete(filePath);
+                    File.Delete(fileInfo.FullName);
                     deleted++;
 
-                    // 文件删除成功后，若其所在子目录为空则一并删除（不删除配置根目录）
-                    var dirPath = Path.GetDirectoryName(filePath);
-                    if (!string.IsNullOrEmpty(dirPath)
-                        && !string.Equals(Path.GetFullPath(dirPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), rootPath, StringComparison.OrdinalIgnoreCase)
-                        && IsDirectoryEmpty(dirPath))
-                    {
-                        try
-                        {
-                            Directory.Delete(dirPath, false);
-                            removedDirs++;
-                        }
-                        catch
-                        {
-                            // 空目录删除失败不影响文件删除结果
-                        }
-                    }
+                    var parentDir = fileInfo.DirectoryName;
+                    if (!string.IsNullOrEmpty(parentDir))
+                        pendingDirs.Add(parentDir);
                 }
                 catch
                 {
                     failed++;
                 }
             }
-
-            return (deleted, failed, removedDirs, null);
         }
 
         /// <summary>

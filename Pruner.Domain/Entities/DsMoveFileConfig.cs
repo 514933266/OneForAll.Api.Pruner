@@ -45,7 +45,7 @@ namespace Pruner.Domain.Entities
         public int MaxMoveCount { get; set; }
 
         /// <summary>
-        /// 是否递归子目录
+        /// 是否递归迁移（递归迁移时，会按照原文件所在目录层级迁移）
         /// </summary>
         [Required]
         public bool IncludeSubDirectories { get; set; }
