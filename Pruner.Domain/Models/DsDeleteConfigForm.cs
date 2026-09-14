@@ -57,6 +57,11 @@ namespace Pruner.Domain.Models
         public int MaxDelCount { get; set; }
 
         /// <summary>
+        /// 是否启用LastDelId限制（启用时按最后删除Id逐批向后推进删除；停用时每次直接按查询条件删除）
+        /// </summary>
+        public bool IsLastDelIdEnabled { get; set; } = true;
+
+        /// <summary>
         /// 延迟执行时间
         /// </summary>
         public DateTime? WaitingTime { get; set; }

@@ -16,7 +16,8 @@
   - 按时间字段（如 `CreateTime`）保留指定天数内的数据（`KeepDays`）。
   - 支持自定义 SQL 条件（`CustonWhere`），实现复杂逻辑过滤。
 - ✅ **分批删除机制**：每次删除限定数量（`MaxDelCount`），避免大事务锁表。
-- ✅ **断点续删支持**：记录上次删除的主键 ID（`LastDelId`），防止重复扫描。
+- ✅ **断点续删支持**：记录上次删除的主键 ID（`LastDelId`），防止重复扫描（要求主键与时间严格同序，如自增 ID）。
+- ✅ **删除模式可配置**：可针对每个表停用 `LastDelId` 限制，每次直接按查询条件删除一批数据，适用于雪花 ID 等非严格递增 ID，避免漏删。
 - ✅ **启停控制**：可通过配置启用/禁用特定表的删除任务。
 
 ### 📁 二、自动文件删除
@@ -67,6 +68,7 @@
 | `CustonWhere` | nvarchar(2000) | 自定义删除条件（额外 WHERE 子句） |
 | `KeepId` | bigint | 保留主键 ID 大于该值的数据（可选） |
 | `MaxDelCount` | int | 每次删除最大行数 |
+| `IsLastDelIdEnabled` | bit | 是否启用 `LastDelId` 断点续删：1=启用（按 ID 区间逐批推进，要求主键与时间严格同序，如自增 ID）；0=停用（每次直接按查询条件删除，适用于雪花 ID 等非严格递增 ID） |
 | `LastDelId` | bigint | 上次删除的最大主键 ID（用于断点续删） |
 | `LastDelTime` | datetime2 | 上次执行删除时间 |
 | `WaitingTime` | datetime2 | 下次执行等待时间（可用于延迟执行） |

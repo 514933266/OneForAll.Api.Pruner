@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Repositorys;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Pruner.Repository
 {
@@ -13,6 +16,25 @@ namespace Pruner.Repository
         public DsGlobalConfigRepository(DbContext context)
             : base(context)
         {
+        }
+
+        /// <summary>
+        /// 分页查询全局配置
+        /// </summary>
+        public async Task<PageList<DsGlobalConfig>> GetPageListAsync(int pageIndex, int pageSize, string key = "")
+        {
+            var query = DbSet.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(key))
+                query = query.Where(e => e.SourceDbName.Contains(key));
+
+            var total = await query.CountAsync();
+            var list = await query
+                .OrderBy(e => e.Id)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PageList<DsGlobalConfig>(total, pageIndex, pageSize, list);
         }
     }
 }

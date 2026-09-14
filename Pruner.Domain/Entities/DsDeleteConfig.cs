@@ -20,6 +20,12 @@ namespace Pruner.Domain.Entities
         public int GlobalConfigId { get; set; }
 
         /// <summary>
+        /// 数据库名称（取自所属全局配置，非持久化字段）
+        /// </summary>
+        [NotMapped]
+        public string SourceDbName { get; set; }
+
+        /// <summary>
         /// 表名
         /// </summary>
         [Required]
@@ -57,6 +63,12 @@ namespace Pruner.Domain.Entities
         /// </summary>
         [Required]
         public int MaxDelCount { get; set; }
+
+        /// <summary>
+        /// 是否启用LastDelId限制（启用时按最后删除Id逐批向后推进删除；停用时每次直接按查询条件删除）
+        /// </summary>
+        [Required]
+        public bool IsLastDelIdEnabled { get; set; } = true;
 
         /// <summary>
         /// 最后删除的数据id

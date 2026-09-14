@@ -77,20 +77,21 @@ namespace Pruner.Domain
             sb.Insert(0, $"文件迁移任务执行完成，共迁移{totalMoved}个文件。\n");
 
             // 记录本地运行日志
-            await AddRunningLogAsync(sb.ToString());
+            await AddRunningLogAsync(sb.ToString(), clientCode);
             return sb.ToString();
         }
 
         /// <summary>
         /// 记录本地运行日志
         /// </summary>
-        private async Task AddRunningLogAsync(string description)
+        private async Task AddRunningLogAsync(string description, string clientCode)
         {
             await _runningLogRepository.AddAsync(new DsRunningLog()
             {
                 TypeName = "MonitorFileMoveJob",
                 TableName = "文件迁移",
                 Description = description,
+                ClientCode = clientCode,
                 CreateTime = DateTime.UtcNow
             });
         }

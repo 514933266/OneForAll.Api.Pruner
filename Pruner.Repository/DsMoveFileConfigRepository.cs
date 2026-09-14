@@ -28,8 +28,10 @@ namespace Pruner.Repository
                 query = query.Where(e => e.SourcePath.Contains(key) || e.TargetPath.Contains(key) || e.ClientCode.Contains(key));
 
             var total = await query.CountAsync();
+            // 按客户端代码排序，同客户端内新配置在前
             var list = await query
-                .OrderByDescending(e => e.Id)
+                .OrderBy(e => e.ClientCode)
+                .ThenByDescending(e => e.Id)
                 .Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

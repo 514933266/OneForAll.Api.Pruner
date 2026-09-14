@@ -61,26 +61,26 @@ namespace Pruner.Domain
                     {
                         var desc = $"目录[{config.Path}]{warning}";
                         sb.AppendLine(desc);
-                        await AddRunningLogAsync(config.Path, desc);
+                        await AddRunningLogAsync(config.Path, desc, config.ClientCode);
                     }
                     else if (failed > 0)
                     {
                         var desc = $"目录[{config.Path}]删除{deleted}个过期文件，{failed}个文件因权限不足或被占用删除失败（保留{config.KeepDays}天）{dirSummary}";
                         sb.AppendLine(desc);
-                        await AddRunningLogAsync(config.Path, desc);
+                        await AddRunningLogAsync(config.Path, desc, config.ClientCode);
                     }
                     else
                     {
                         var desc = $"目录[{config.Path}]删除{deleted}个过期文件（保留{config.KeepDays}天）{dirSummary}";
                         sb.AppendLine(desc);
-                        await AddRunningLogAsync(config.Path, desc);
+                        await AddRunningLogAsync(config.Path, desc, config.ClientCode);
                     }
                 }
                 catch (Exception ex)
                 {
                     var desc = $"目录[{config.Path}]处理失败：{ex.Message}";
                     sb.AppendLine(desc);
-                    await AddRunningLogAsync(config.Path, desc);
+                    await AddRunningLogAsync(config.Path, desc, config.ClientCode);
                 }
             }
 
@@ -91,13 +91,14 @@ namespace Pruner.Domain
         /// <summary>
         /// 记录本地运行日志
         /// </summary>
-        private async Task AddRunningLogAsync(string tableName, string description)
+        private async Task AddRunningLogAsync(string tableName, string description, string clientCode)
         {
             await _runningLogRepository.AddAsync(new DsRunningLog()
             {
                 TypeName = "MonitorFileDeleteJob",
                 TableName = tableName,
                 Description = description,
+                ClientCode = clientCode,
                 CreateTime = DateTime.UtcNow
             });
         }

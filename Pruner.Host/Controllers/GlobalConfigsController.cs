@@ -5,8 +5,6 @@ using OneForAll.Core;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Models;
 using Pruner.Domain.Repositorys;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Pruner.Host.Controllers
@@ -29,12 +27,18 @@ namespace Pruner.Host.Controllers
         }
 
         /// <summary>
-        /// 获取全局配置列表
+        /// 分页查询全局配置
         /// </summary>
+        /// <param name="pageIndex">页码（从1开始）</param>
+        /// <param name="pageSize">每页数量</param>
+        /// <param name="key">关键字（源数据库名）</param>
         [HttpGet]
-        public async Task<List<DsGlobalConfig>> GetListAsync()
+        public async Task<PageList<DsGlobalConfig>> GetPageAsync(int pageIndex = 1, int pageSize = 10, string key = "")
         {
-            return (await _repository.GetListAsync()).ToList();
+            if (pageIndex < 1) pageIndex = 1;
+            if (pageSize < 1) pageSize = 10;
+
+            return await _repository.GetPageListAsync(pageIndex, pageSize, key);
         }
 
         /// <summary>
@@ -85,6 +89,25 @@ namespace Pruner.Host.Controllers
                 return BaseMessage.Success("修改成功", exists);
 
             return msg.Fail("修改失败");
+        }
+
+        /// <summary>
+        /// 启用/禁用全局配置
+        /// </summary>
+        [HttpPut("{id}/Enabled/{isEnabled}")]
+        public async Task<BaseMessage> UpdateEnabledAsync(int id, bool isEnabled)
+        {
+            var msg = new BaseMessage();
+            var exists = await _repository.FindAsync(id);
+            if (exists == null)
+                return msg.Fail(BaseErrType.DataNotFound, "全局配置不存在");
+
+            exists.IsEnabled = isEnabled;
+            var count = await _repository.UpdateAsync(exists);
+            if (count > 0)
+                return msg.Success(isEnabled ? "已启用" : "已禁用");
+
+            return msg.Fail("操作失败");
         }
 
         /// <summary>

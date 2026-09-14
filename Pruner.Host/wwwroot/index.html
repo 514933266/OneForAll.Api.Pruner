@@ -102,22 +102,8 @@
         <!-- 全局配置 -->
         <div v-if="page === 'global'">
           <h3 class="page-title">全局配置</h3>
-          <el-card shadow="never" style="max-width:760px">
-            <el-alert type="info" :closable="false" style="margin-bottom:14px" title="全局配置为服务级参数，SourceConn 为删除/同步数据源连接，TargetConn 为同步目标库连接（可选）。"></el-alert>
-            <el-form :model="globalForm" label-width="160px" style="max-width:640px">
-              <el-form-item label="源数据库名"><el-input v-model="globalForm.SourceDbName" placeholder="如 OneForAll"></el-input></el-form-item>
-              <el-form-item label="每次最大删除数量"><el-input-number v-model="globalForm.MaxDelCount" :min="1"></el-input-number></el-form-item>
-              <el-form-item label="每次最大同步数量"><el-input-number v-model="globalForm.MaxSyncCount" :min="1"></el-input-number></el-form-item>
-              <el-form-item label="源库连接字符串"><el-input v-model="globalForm.SourceConn" type="textarea" :rows="2" placeholder="Data Source=...;Initial Catalog=...;..."></el-input></el-form-item>
-              <el-form-item label="目标库连接字符串"><el-input v-model="globalForm.TargetConn" type="textarea" :rows="2" placeholder="Data Source=...;Initial Catalog=...;..."></el-input></el-form-item>
-              <el-form-item label="启用删除服务"><el-switch v-model="globalForm.IsEnabledDel"></el-switch></el-form-item>
-              <el-form-item label="启用同步服务"><el-switch v-model="globalForm.IsEnabledSync"></el-switch></el-form-item>
-              <el-form-item label="启用本服务"><el-switch v-model="globalForm.IsEnabled"></el-switch></el-form-item>
-              <el-form-item>
-                <el-button type="primary" :loading="globalSaving" @click="saveGlobal">保存全局配置</el-button>
-              </el-form-item>
-            </el-form>
-          </el-card>
+          <el-alert type="info" :closable="false" style="margin-bottom:14px" title="全局配置为服务级参数，SourceConn 为删除/同步数据源连接，TargetConn 为同步目标库连接（可选）。"></el-alert>
+          <config-page api="GlobalConfigs" placeholder="按源数据库名搜索" :columns="globalColumns" :fields="globalFields"></config-page>
         </div>
 
         <!-- 数据库删除配置 -->
@@ -157,6 +143,9 @@
             <el-table :data="logs" v-loading="logLoading" border stripe size="small">
               <el-table-column prop="Id" label="ID" width="90"></el-table-column>
               <el-table-column prop="TypeName" label="日志类型" width="180"></el-table-column>
+              <el-table-column prop="ClientCode" label="客户端" width="160" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.ClientCode || '-' }}</template>
+              </el-table-column>
               <el-table-column prop="TableName" label="涉及表/目录" width="200" show-overflow-tooltip></el-table-column>
               <el-table-column prop="Description" label="描述" min-width="260" show-overflow-tooltip></el-table-column>
               <el-table-column prop="CreateTime" label="创建时间" width="170"></el-table-column>
@@ -271,7 +260,8 @@ const ConfigPage = {
                 <span class="field-tip">?</span>
               </el-tooltip>
             </template>
-            <el-input v-if="f.type === 'input'" v-model="state.form[f.prop]" :placeholder="'请输入' + f.label" />
+            <el-input v-if="f.type === 'textarea'" v-model="state.form[f.prop]" type="textarea" :rows="2" :placeholder="'请输入' + f.label" />
+            <el-input v-else-if="f.type === 'input'" v-model="state.form[f.prop]" :placeholder="'请输入' + f.label" />
             <el-input-number v-else-if="f.type === 'number'" v-model="state.form[f.prop]" :min="f.min !== undefined ? f.min : 0" :max="f.max" style="width:100%" />
             <el-switch v-else-if="f.type === 'switch'" v-model="state.form[f.prop]" />
             <el-date-picker v-else-if="f.type === 'datetime'" v-model="state.form[f.prop]" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择时间" style="width:100%" />
@@ -294,7 +284,7 @@ const ConfigPage = {
     const defaultForm = () => {
       const f = {};
       props.fields.forEach(field => {
-        if (field.type === 'switch') f[field.prop] = false;
+        if (field.type === 'switch') f[field.prop] = field.default !== undefined ? field.default : false;
         else if (field.type === 'number') f[field.prop] = field.default !== undefined ? field.default : 0;
         else if (field.type === 'datetime') f[field.prop] = null;
         else f[field.prop] = '';
@@ -370,10 +360,6 @@ const app = createApp({
     const globalConfig = ref(null);
     const exec = reactive({ del: false, fdel: false, move: false });
 
-    // 全局配置
-    const globalForm = reactive({ Id: 0, SourceDbName: '', MaxDelCount: 50, MaxSyncCount: 50, SourceConn: '', TargetConn: '', IsEnabledDel: false, IsEnabledSync: false, IsEnabled: false });
-    const globalSaving = ref(false);
-
     // 运行日志
     const logs = ref([]);
     const logTotal = ref(0);
@@ -388,11 +374,13 @@ const app = createApp({
     // 列配置
     const dbDeleteColumns = [
       { prop: 'Id', label: 'ID', width: 60 },
+      { prop: 'SourceDbName', label: '数据库名称', width: 150 },
       { prop: 'TableName', label: '表名', minWidth: 140 },
       { prop: 'KeepDays', label: '保留天数', width: 90 },
       { prop: 'DateFieldName', label: '时间字段', width: 110 },
       { prop: 'CustonWhere', label: '自定义条件', minWidth: 120 },
       { prop: 'KeepId', label: '保留Id', width: 90 },
+      { prop: 'IsLastDelIdEnabled', label: 'LastDelId限制', width: 115, type: 'tag' },
       { prop: 'MaxDelCount', label: '最大删除数', width: 100 },
       { prop: 'LastDelId', label: '最后删除Id', width: 110 },
       { prop: 'LastDelTime', label: '最后删除时间', width: 165, type: 'date' },
@@ -406,6 +394,7 @@ const app = createApp({
       { prop: 'DateFieldName', label: '时间字段名', type: 'input', required: true },
       { prop: 'CustonWhere', label: '自定义删除条件', type: 'input' },
       { prop: 'KeepId', label: '数据保留Id', type: 'number', min: 0 },
+      { prop: 'IsLastDelIdEnabled', label: '启用LastDelId限制', type: 'switch', default: true, tooltip: '启用：按最后删除Id逐批向后推进删除（要求id与时间严格同序）；停用：每次直接按查询条件删除一批数据，适用于雪花id等非严格递增id，可避免漏删' },
       { prop: 'MaxDelCount', label: '每次最大删除数量', type: 'number', min: 1, default: 50 },
       { prop: 'WaitingTime', label: '延迟执行时间', type: 'datetime' },
       { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
@@ -449,6 +438,28 @@ const app = createApp({
       { prop: 'IsEnabled', label: '是否启用', type: 'switch' }
     ];
 
+    const globalColumns = [
+      { prop: 'Id', label: 'ID', width: 60 },
+      { prop: 'SourceDbName', label: '源数据库名', width: 150 },
+      { prop: 'MaxDelCount', label: '最大删除数', width: 100 },
+      { prop: 'MaxSyncCount', label: '最大同步数', width: 100 },
+      { prop: 'SourceConn', label: '源库连接字符串', minWidth: 200 },
+      { prop: 'TargetConn', label: '目标库连接字符串', minWidth: 200 },
+      { prop: 'IsEnabledDel', label: '删除服务', width: 90, type: 'tag' },
+      { prop: 'IsEnabledSync', label: '同步服务', width: 90, type: 'tag' },
+      { prop: 'IsEnabled', label: '启用', width: 80, type: 'switch' }
+    ];
+    const globalFields = [
+      { prop: 'SourceDbName', label: '源数据库名', type: 'input', required: true },
+      { prop: 'MaxDelCount', label: '每次最大删除数量', type: 'number', min: 1, default: 50 },
+      { prop: 'MaxSyncCount', label: '每次最大同步数量', type: 'number', min: 1, default: 50 },
+      { prop: 'SourceConn', label: '源库连接字符串', type: 'textarea', required: true },
+      { prop: 'TargetConn', label: '目标库连接字符串', type: 'textarea' },
+      { prop: 'IsEnabledDel', label: '启用删除服务', type: 'switch', default: false },
+      { prop: 'IsEnabledSync', label: '启用同步服务', type: 'switch', default: false },
+      { prop: 'IsEnabled', label: '启用本服务', type: 'switch', default: false }
+    ];
+
     // 概览数据
     async function loadDashboard() {
       try {
@@ -457,38 +468,15 @@ const app = createApp({
           request('/api/DeleteFileConfigs?pageIndex=1&pageSize=1'),
           request('/api/MoveFileConfigs?pageIndex=1&pageSize=1'),
           request('/api/RunningLogs?pageIndex=1&pageSize=1'),
-          request('/api/GlobalConfigs')
+          request('/api/GlobalConfigs?pageIndex=1&pageSize=1')
         ]);
         stats.dbDelete = db.Total;
         stats.fileDelete = fd.Total;
         stats.fileMove = mv.Total;
         stats.logs = lg.Total;
-        if (g && g.length > 0) {
-          globalConfig.value = g[0];
-          Object.assign(globalForm, g[0]);
-        }
+        globalConfig.value = (g && g.Items && g.Items.length > 0) ? g.Items[0] : null;
       } catch (e) {
         ElMessage.error(e.message);
-      }
-    }
-
-    // 全局配置保存
-    async function saveGlobal() {
-      globalSaving.value = true;
-      try {
-        const body = JSON.stringify(globalForm);
-        const res = globalForm.Id > 0
-          ? await request(`/api/GlobalConfigs/${globalForm.Id}`, { method: 'PUT', body })
-          : await request('/api/GlobalConfigs', { method: 'POST', body });
-        if (isOk(res)) {
-          ElMessage.success(res.Message);
-          globalConfig.value = res.Data;
-          loadDashboard();
-        } else {
-          ElMessage.error(res.Message || '保存失败');
-        }
-      } finally {
-        globalSaving.value = false;
       }
     }
 
@@ -593,13 +581,14 @@ const app = createApp({
     onMounted(() => { loadDashboard(); });
 
     return {
-      page, stats, globalConfig, exec, globalForm, globalSaving,
+      page, stats, globalConfig, exec,
       logs, logTotal, logLoading, logQuery, logTypes,
       jobs, jobLoading,
       dbDeleteColumns, dbDeleteFields,
       fileDeleteColumns, fileDeleteFields,
       fileMoveColumns, fileMoveFields,
-      saveGlobal, executeTask, loadLogs, resetLogs, deleteLog, clearLogs, loadJobs, triggerJob, refreshAll, onMenuSelect
+      globalColumns, globalFields,
+      executeTask, loadLogs, resetLogs, deleteLog, clearLogs, loadJobs, triggerJob, refreshAll, onMenuSelect
     };
   }
 });

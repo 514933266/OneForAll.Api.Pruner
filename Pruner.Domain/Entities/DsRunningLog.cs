@@ -25,6 +25,12 @@ namespace Pruner.Domain.Entities
         public string TypeName { get; set; }
 
         /// <summary>
+        /// 客户端代码（用于区分不同节点，文件删除/迁移任务写入）
+        /// </summary>
+        [Column(TypeName = "varchar(200)")]
+        public string ClientCode { get; set; }
+
+        /// <summary>
         /// 日志类型
         /// </summary>
         [Required]

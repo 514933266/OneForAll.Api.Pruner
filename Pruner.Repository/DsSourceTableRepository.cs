@@ -68,5 +68,41 @@ namespace Pruner.Repository
                 return await connection.ExecuteAsync(sql, parameters);
             }
         }
+
+        /// <summary>
+        /// 按查询条件直接删除一批数据（不依赖id区间推进，适用于雪花id等非严格递增id）
+        /// </summary>
+        public async Task<int> DelTopAsync(string sourceConn, string tableName, int topNum, long maxId, string dateFieldName, DateTime cutoffDate, string customWhere)
+        {
+            if (topNum < 1) topNum = 1;
+
+            var parameters = new DynamicParameters();
+
+            var subSql = $"SELECT TOP {topNum} id FROM {tableName} WHERE 1 = 1";
+            if (maxId > 0)
+            {
+                subSql += " AND Id <= @MaxId";
+                parameters.Add("@MaxId", maxId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(dateFieldName))
+            {
+                subSql += $" AND {dateFieldName} < @CreateTime";
+                parameters.Add("@CreateTime", cutoffDate.ToString("yyyy-MM-dd"));
+            }
+
+            if (!string.IsNullOrEmpty(customWhere))
+                subSql += $" AND {customWhere}";
+
+            subSql += " ORDER BY id ASC";
+
+            var sql = $"DELETE FROM {tableName} WHERE Id IN ({subSql})";
+
+            using (var connection = new SqlConnection(sourceConn))
+            {
+                await connection.OpenAsync();
+                return await connection.ExecuteAsync(sql, parameters);
+            }
+        }
     }
 }
