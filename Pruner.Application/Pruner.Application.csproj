@@ -20,7 +20,6 @@
     <ProjectReference Include="..\Pruner.Domain\Pruner.Domain.csproj" />
     <ProjectReference Include="..\Pruner.HttpSevice\Pruner.HttpService.csproj" />
     <ProjectReference Include="..\Pruner.Public\Pruner.Public.csproj" />
-    <ProjectReference Include="..\Pruner.Repository\Pruner.Repository.csproj" />
   </ItemGroup>
 
 </Project>

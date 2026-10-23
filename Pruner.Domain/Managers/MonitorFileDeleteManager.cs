@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using OneForAll.Core;
+﻿using OneForAll.Core;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Interfaces;
 using Pruner.Domain.Repositorys;
@@ -10,12 +9,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Pruner.Domain
+namespace Pruner.Domain.Managers
 {
     /// <summary>
     /// 监控文件删除
     /// </summary>
-    public class MonitorFileDeleteManager : BaseManager, IMonitorFileDeleteManager
+    public class MonitorFileDeleteManager : PrunerDomainManager, IMonitorFileDeleteManager
     {
         private readonly IDsDeleteFileConfigRepository _configRepository;
         private readonly IDsRunningLogRepository _runningLogRepository;
@@ -26,9 +25,9 @@ namespace Pruner.Domain
         private const int BatchSize = 1000;
 
         public MonitorFileDeleteManager(
-            IHttpContextAccessor httpContextAccessor,
+            ICurrentUser currentUser,
             IDsDeleteFileConfigRepository configRepository,
-            IDsRunningLogRepository runningLogRepository) : base(httpContextAccessor)
+            IDsRunningLogRepository runningLogRepository) : base(currentUser)
         {
             _configRepository = configRepository;
             _runningLogRepository = runningLogRepository;
@@ -41,7 +40,7 @@ namespace Pruner.Domain
         /// <returns>删除结果描述</returns>
         public async Task<string> HandleDeleteAsync(string clientCode)
         {
-            var configs = (await _configRepository.GetListAsync(w => w.IsEnabled && w.ClientCode == clientCode)).ToList();
+            var configs = (await _configRepository.GetListEnabledByClientAsync(clientCode)).ToList();
             if (!configs.Any())
                 return "文件删除任务未配置任何目录，跳过执行";
 

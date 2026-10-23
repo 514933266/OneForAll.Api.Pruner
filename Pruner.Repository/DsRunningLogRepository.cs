@@ -4,6 +4,7 @@ using OneForAll.EFCore;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Repositorys;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -42,6 +43,14 @@ namespace Pruner.Repository
                 .ToListAsync();
 
             return new PageList<DsRunningLog>(total, pageIndex, pageSize, list);
+        }
+
+        /// <summary>
+        /// 获取指定时间之前创建的运行日志列表
+        /// </summary>
+        public async Task<IEnumerable<DsRunningLog>> GetListCreatedBeforeAsync(DateTime createTime)
+        {
+            return await DbSet.Where(e => e.CreateTime < createTime).ToListAsync();
         }
     }
 }

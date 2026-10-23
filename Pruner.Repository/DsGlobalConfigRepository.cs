@@ -3,6 +3,7 @@ using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Repositorys;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -35,6 +36,14 @@ namespace Pruner.Repository
                 .ToListAsync();
 
             return new PageList<DsGlobalConfig>(total, pageIndex, pageSize, list);
+        }
+
+        /// <summary>
+        /// 获取启用的全局配置列表
+        /// </summary>
+        public async Task<IEnumerable<DsGlobalConfig>> GetListEnabledAsync()
+        {
+            return await DbSet.Where(e => e.IsEnabled).ToListAsync();
         }
     }
 }

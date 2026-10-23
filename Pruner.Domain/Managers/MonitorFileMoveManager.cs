@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using OneForAll.Core;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Interfaces;
@@ -10,12 +9,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Pruner.Domain
+namespace Pruner.Domain.Managers
 {
     /// <summary>
     /// 监控文件迁移
     /// </summary>
-    public class MonitorFileMoveManager : BaseManager, IMonitorFileMoveManager
+    public class MonitorFileMoveManager : PrunerDomainManager, IMonitorFileMoveManager
     {
         private readonly IDsMoveFileConfigRepository _configRepository;
         private readonly IDsRunningLogRepository _runningLogRepository;
@@ -26,9 +25,9 @@ namespace Pruner.Domain
         private const int BatchSize = 1000;
 
         public MonitorFileMoveManager(
-            IHttpContextAccessor httpContextAccessor,
+            ICurrentUser currentUser,
             IDsMoveFileConfigRepository configRepository,
-            IDsRunningLogRepository runningLogRepository) : base(httpContextAccessor)
+            IDsRunningLogRepository runningLogRepository) : base(currentUser)
         {
             _configRepository = configRepository;
             _runningLogRepository = runningLogRepository;
@@ -41,7 +40,7 @@ namespace Pruner.Domain
         /// <returns>迁移结果描述</returns>
         public async Task<string> HandleMoveAsync(string clientCode)
         {
-            var configs = await _configRepository.GetListAsync(w => w.IsEnabled && w.ClientCode == clientCode);
+            var configs = await _configRepository.GetListEnabledByClientAsync(clientCode);
             if (!configs.Any())
                 return "文件迁移任务未配置任何目录，跳过执行";
 

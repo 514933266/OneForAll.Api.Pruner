@@ -1,6 +1,7 @@
 using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Pruner.Domain.Repositorys
@@ -17,5 +18,11 @@ namespace Pruner.Domain.Repositorys
         /// <param name="pageSize">每页数量</param>
         /// <param name="key">关键字（源数据库名）</param>
         Task<PageList<DsGlobalConfig>> GetPageListAsync(int pageIndex, int pageSize, string key = "");
+
+        /// <summary>
+        /// 获取启用的全局配置列表
+        /// </summary>
+        /// <returns>列表</returns>
+        Task<IEnumerable<DsGlobalConfig>> GetListEnabledAsync();
     }
 }

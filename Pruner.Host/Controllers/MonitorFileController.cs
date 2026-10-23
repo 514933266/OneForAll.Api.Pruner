@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OneForAll.Core;
-using Pruner.Domain.Interfaces;
+using Pruner.Application.Interfaces;
 using Pruner.Public.Models;
 using System.Threading.Tasks;
 
@@ -16,17 +16,14 @@ namespace Pruner.Host.Controllers
     public class MonitorFileController : Controller
     {
         private readonly AuthConfig _authConfig;
-        private readonly IMonitorFileDeleteManager _deleteManager;
-        private readonly IMonitorFileMoveManager _moveManager;
+        private readonly IMonitorExecService _execService;
 
         public MonitorFileController(
             AuthConfig authConfig,
-            IMonitorFileDeleteManager deleteManager,
-            IMonitorFileMoveManager moveManager)
+            IMonitorExecService execService)
         {
             _authConfig = authConfig;
-            _deleteManager = deleteManager;
-            _moveManager = moveManager;
+            _execService = execService;
         }
 
         /// <summary>
@@ -35,9 +32,8 @@ namespace Pruner.Host.Controllers
         [HttpPost("Delete")]
         public async Task<BaseMessage> ExecuteDeleteAsync()
         {
-            var msg = new BaseMessage();
-            var result = await _deleteManager.HandleDeleteAsync(_authConfig.ClientCode);
-            return msg.Success(result);
+            var result = await _execService.HandleFileDeleteAsync(_authConfig.ClientCode);
+            return new BaseMessage().Success(result.Message);
         }
 
         /// <summary>
@@ -46,9 +42,8 @@ namespace Pruner.Host.Controllers
         [HttpPost("Move")]
         public async Task<BaseMessage> ExecuteMoveAsync()
         {
-            var msg = new BaseMessage();
-            var result = await _moveManager.HandleMoveAsync(_authConfig.ClientCode);
-            return msg.Success(result);
+            var result = await _execService.HandleFileMoveAsync(_authConfig.ClientCode);
+            return new BaseMessage().Success(result.Message);
         }
     }
 }

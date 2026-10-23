@@ -1,6 +1,8 @@
 using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Pruner.Domain.Repositorys
@@ -18,5 +20,12 @@ namespace Pruner.Domain.Repositorys
         /// <param name="tableName">表名关键字</param>
         /// <returns>分页结果</returns>
         Task<PageList<DsDeleteConfig>> GetPageListAsync(int pageIndex, int pageSize, string tableName = "");
+
+        /// <summary>
+        /// 获取已启用且等待时间已到（或无等待时间）的删除配置列表
+        /// </summary>
+        /// <param name="maxWaitingDate">等待时间上限</param>
+        /// <returns>列表</returns>
+        Task<IEnumerable<DsDeleteConfig>> GetListReadyAsync(DateTime maxWaitingDate);
     }
 }

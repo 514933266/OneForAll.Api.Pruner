@@ -1,9 +1,8 @@
-using Pruner.Domain.Interfaces;
+using Pruner.Application.Interfaces;
 using Pruner.Host.Models;
 using Pruner.HttpService.Interfaces;
 using Pruner.Public.Models;
 using Quartz;
-using System;
 using System.Threading.Tasks;
 
 namespace Pruner.Host.QuartzJobs
@@ -12,41 +11,29 @@ namespace Pruner.Host.QuartzJobs
     /// 监控数据库数据删除任务
     /// </summary>
     [DisallowConcurrentExecution]
-    public class MonitorDbDeleteJob : IJob
+    public class MonitorDbDeleteJob : BaseLockJob
     {
-        private readonly AuthConfig _config;
-        private readonly IScheduleJobHttpService _service;
-        private readonly IMonitorDbDeleteManager _manager;
+        private readonly IMonitorExecService _execService;
 
         public MonitorDbDeleteJob(
-            AuthConfig config,
-            IScheduleJobHttpService service,
-            IMonitorDbDeleteManager manager)
+            IMonitorExecService execService,
+            QuartzScheduleJobConfig jobConfig,
+            AuthConfig authConfig,
+            JobLockConfig lockConfig,
+            IScheduleJobHttpService jobHttpService,
+            ISysGlobalExceptionLogHttpService logHttpService)
+            : base(jobConfig, authConfig, lockConfig, jobHttpService, logHttpService)
         {
-            _config = config;
-            _service = service;
-            _manager = manager;
-        }
-
-        public async Task Execute(IJobExecutionContext context)
-        {
-            try
-            {
-                var result = await _manager.HandleDeleteAsync();
-                await AddLogAsync($"数据维护删除任务执行完成，共删除{result}条数据");
-            }
-            catch (Exception ex)
-            {
-                await AddLogAsync($"数据维护删除任务执行失败：{ex.Message}\n{ex.StackTrace}", true);
-            }
+            _execService = execService;
         }
 
         /// <summary>
-        /// 记录定时任务日志
+        /// 执行任务
         /// </summary>
-        private async Task AddLogAsync(string log, bool isException = false)
+        protected override async Task ExecuteInternalAsync(IJobExecutionContext context)
         {
-            await _service.LogAsync(_config.ClientCode, typeof(MonitorDbDeleteJob).Name, log, isException);
+            var result = await _execService.HandleDbDeleteAsync(_authConfig.ClientCode);
+            await AddLogAsync(result.Message);
         }
     }
 }

@@ -3,6 +3,7 @@ using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Repositorys;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -37,6 +38,14 @@ namespace Pruner.Repository
                 .ToListAsync();
 
             return new PageList<DsDeleteFileConfig>(total, pageIndex, pageSize, list);
+        }
+
+        /// <summary>
+        /// 获取指定客户端启用的文件删除配置列表
+        /// </summary>
+        public async Task<IEnumerable<DsDeleteFileConfig>> GetListEnabledByClientAsync(string clientCode)
+        {
+            return await DbSet.Where(e => e.IsEnabled && e.ClientCode == clientCode).ToListAsync();
         }
     }
 }

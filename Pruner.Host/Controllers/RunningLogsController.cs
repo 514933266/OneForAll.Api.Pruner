@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OneForAll.Core;
+using Pruner.Application.Interfaces;
 using Pruner.Domain.Entities;
-using Pruner.Domain.Repositorys;
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Pruner.Host.Controllers
@@ -17,11 +16,11 @@ namespace Pruner.Host.Controllers
     [AllowAnonymous]
     public class RunningLogsController : Controller
     {
-        private readonly IDsRunningLogRepository _repository;
+        private readonly IDsRunningLogService _service;
 
-        public RunningLogsController(IDsRunningLogRepository repository)
+        public RunningLogsController(IDsRunningLogService service)
         {
-            _repository = repository;
+            _service = service;
         }
 
         /// <summary>
@@ -42,10 +41,7 @@ namespace Pruner.Host.Controllers
             DateTime? endTime = null,
             string key = "")
         {
-            if (pageIndex < 1) pageIndex = 1;
-            if (pageSize < 1) pageSize = 10;
-
-            return await _repository.GetPageListAsync(pageIndex, pageSize, typeName, key, startTime, endTime);
+            return await _service.GetPageAsync(pageIndex, pageSize, typeName, key, startTime, endTime);
         }
 
         /// <summary>
@@ -54,16 +50,7 @@ namespace Pruner.Host.Controllers
         [HttpDelete("{id}")]
         public async Task<BaseMessage> DeleteAsync(long id)
         {
-            var msg = new BaseMessage();
-            var entity = await _repository.FindAsync(id);
-            if (entity == null)
-                return msg.Fail(BaseErrType.DataNotFound, "日志不存在");
-
-            var count = await _repository.DeleteAsync(entity);
-            if (count > 0)
-                return msg.Success("删除成功");
-
-            return msg.Fail("删除失败");
+            return await _service.DeleteAsync(id);
         }
 
         /// <summary>
@@ -72,16 +59,7 @@ namespace Pruner.Host.Controllers
         [HttpDelete]
         public async Task<BaseMessage> ClearAsync()
         {
-            var msg = new BaseMessage();
-            var list = (await _repository.GetListAsync()).ToList();
-            if (!list.Any())
-                return msg.Success("日志已为空");
-
-            var count = await _repository.DeleteRangeAsync(list);
-            if (count > 0)
-                return msg.Success($"已清空{count}条日志");
-
-            return msg.Fail("清空失败");
+            return await _service.ClearAsync();
         }
     }
 }

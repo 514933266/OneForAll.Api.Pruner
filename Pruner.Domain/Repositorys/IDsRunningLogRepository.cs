@@ -2,6 +2,7 @@ using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Pruner.Domain.Repositorys
@@ -22,5 +23,12 @@ namespace Pruner.Domain.Repositorys
         /// <param name="endTime">结束时间</param>
         /// <returns>分页结果</returns>
         Task<PageList<DsRunningLog>> GetPageListAsync(int pageIndex, int pageSize, string typeName = "", string key = "", DateTime? startTime = null, DateTime? endTime = null);
+
+        /// <summary>
+        /// 获取指定时间之前创建的运行日志列表
+        /// </summary>
+        /// <param name="createTime">创建时间上限</param>
+        /// <returns>列表</returns>
+        Task<IEnumerable<DsRunningLog>> GetListCreatedBeforeAsync(DateTime createTime);
     }
 }

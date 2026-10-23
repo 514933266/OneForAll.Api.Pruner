@@ -79,5 +79,44 @@ namespace Pruner.HttpService
             }
             return BaseErrType.Fail;
         }
+
+        /// <summary>
+        /// 尝试获取任务执行资格（调度中心统一并发控制，返回成功后执行）
+        /// </summary>
+        /// <param name="appId">应用程序id</param>
+        /// <param name="taskName">定时任务名称</param>
+        /// <param name="clientCode">客户端编号</param>
+        /// <returns>检查结果（调度中心不可达或接口报错时抛出异常）</returns>
+        public async Task<JobLockCheckResponse> TryAcquireLockAsync(string appId, string taskName, string clientCode)
+        {
+            var client = GetHttpClient(_config.SysJob);
+            if (client == null || client.BaseAddress == null)
+                throw new Exception("调度中心（ScheduleJob）服务地址未配置");
+
+            var url = $"api/ScheduleJobs/{appId}/{taskName}/LockChecks?clientCode={clientCode}";
+            var response = await client.PostAsync(url, null);
+            var msg = await response.Content.ReadAsAsync<BaseMessage<JobLockCheckResponse>>();
+            return msg?.Data;
+        }
+
+        /// <summary>
+        /// 释放任务执行资格
+        /// </summary>
+        /// <param name="appId">应用程序id</param>
+        /// <param name="taskName">定时任务名称</param>
+        /// <param name="version">锁版本号</param>
+        /// <returns>结果</returns>
+        public async Task<BaseErrType> ReleaseLockAsync(string appId, string taskName, int version)
+        {
+            var client = GetHttpClient(_config.SysJob);
+            if (client != null && client.BaseAddress != null)
+            {
+                var url = $"api/ScheduleJobs/{appId}/{taskName}/LockChecks/{version}";
+                var response = await client.DeleteAsync(url);
+                var msg = await response.Content.ReadAsAsync<BaseMessage>();
+                return msg.ErrType;
+            }
+            return BaseErrType.Fail;
+        }
     }
 }

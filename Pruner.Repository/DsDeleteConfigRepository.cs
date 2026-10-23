@@ -3,6 +3,8 @@ using OneForAll.Core;
 using OneForAll.EFCore;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Repositorys;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -46,6 +48,16 @@ namespace Pruner.Repository
             list.ForEach(e => e.SourceDbName = dbNames.TryGetValue(e.GlobalConfigId, out var name) ? name : "");
 
             return new PageList<DsDeleteConfig>(total, pageIndex, pageSize, list);
+        }
+
+        /// <summary>
+        /// 获取已启用且等待时间已到（或无等待时间）的删除配置列表
+        /// </summary>
+        public async Task<IEnumerable<DsDeleteConfig>> GetListReadyAsync(DateTime maxWaitingDate)
+        {
+            return await DbSet
+                .Where(e => e.IsEnabled && (e.WaitingTime == null || e.WaitingTime < maxWaitingDate))
+                .ToListAsync();
         }
     }
 }

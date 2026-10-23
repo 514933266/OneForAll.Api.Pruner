@@ -1,9 +1,8 @@
-using Pruner.Domain.Interfaces;
+using Pruner.Application.Interfaces;
 using Pruner.Host.Models;
 using Pruner.HttpService.Interfaces;
 using Pruner.Public.Models;
 using Quartz;
-using System;
 using System.Threading.Tasks;
 
 namespace Pruner.Host.QuartzJobs
@@ -12,41 +11,29 @@ namespace Pruner.Host.QuartzJobs
     /// 监控文件迁移任务
     /// </summary>
     [DisallowConcurrentExecution]
-    public class MonitorFileMoveJob : IJob
+    public class MonitorFileMoveJob : BaseLockJob
     {
-        private readonly AuthConfig _authConfig;
-        private readonly IScheduleJobHttpService _service;
-        private readonly IMonitorFileMoveManager _manager;
+        private readonly IMonitorExecService _execService;
 
         public MonitorFileMoveJob(
+            IMonitorExecService execService,
+            QuartzScheduleJobConfig jobConfig,
             AuthConfig authConfig,
-            IScheduleJobHttpService service,
-            IMonitorFileMoveManager manager)
+            JobLockConfig lockConfig,
+            IScheduleJobHttpService jobHttpService,
+            ISysGlobalExceptionLogHttpService logHttpService)
+            : base(jobConfig, authConfig, lockConfig, jobHttpService, logHttpService)
         {
-            _authConfig = authConfig;
-            _service = service;
-            _manager = manager;
-        }
-
-        public async Task Execute(IJobExecutionContext context)
-        {
-            try
-            {
-                var result = await _manager.HandleMoveAsync(_authConfig.ClientCode);
-                await AddLogAsync(result);
-            }
-            catch (Exception ex)
-            {
-                await AddLogAsync($"文件迁移任务执行失败：{ex.Message}\n{ex.StackTrace}", true);
-            }
+            _execService = execService;
         }
 
         /// <summary>
-        /// 记录定时任务日志
+        /// 执行任务
         /// </summary>
-        private async Task AddLogAsync(string log, bool isException = false)
+        protected override async Task ExecuteInternalAsync(IJobExecutionContext context)
         {
-            await _service.LogAsync(_authConfig.ClientCode, typeof(MonitorFileMoveJob).Name, log, isException);
+            var result = await _execService.HandleFileMoveAsync(_authConfig.ClientCode);
+            await AddLogAsync(result.Message);
         }
     }
 }

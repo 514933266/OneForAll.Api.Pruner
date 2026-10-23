@@ -1,10 +1,9 @@
-using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OneForAll.Core;
+using Pruner.Application.Interfaces;
 using Pruner.Domain.Entities;
 using Pruner.Domain.Models;
-using Pruner.Domain.Repositorys;
 using System.Threading.Tasks;
 
 namespace Pruner.Host.Controllers
@@ -17,13 +16,11 @@ namespace Pruner.Host.Controllers
     [AllowAnonymous]
     public class DeleteFileConfigsController : Controller
     {
-        private readonly IDsDeleteFileConfigRepository _repository;
-        private readonly IMapper _mapper;
+        private readonly IDsDeleteFileConfigService _service;
 
-        public DeleteFileConfigsController(IDsDeleteFileConfigRepository repository, IMapper mapper)
+        public DeleteFileConfigsController(IDsDeleteFileConfigService service)
         {
-            _repository = repository;
-            _mapper = mapper;
+            _service = service;
         }
 
         /// <summary>
@@ -35,10 +32,7 @@ namespace Pruner.Host.Controllers
         [HttpGet]
         public async Task<PageList<DsDeleteFileConfig>> GetPageAsync(int pageIndex = 1, int pageSize = 10, string key = "")
         {
-            if (pageIndex < 1) pageIndex = 1;
-            if (pageSize < 1) pageSize = 10;
-
-            return await _repository.GetPageListAsync(pageIndex, pageSize, key);
+            return await _service.GetPageAsync(pageIndex, pageSize, key);
         }
 
         /// <summary>
@@ -47,7 +41,7 @@ namespace Pruner.Host.Controllers
         [HttpGet("{id}")]
         public async Task<DsDeleteFileConfig> GetAsync(int id)
         {
-            return await _repository.FindAsync(id);
+            return await _service.GetAsync(id);
         }
 
         /// <summary>
@@ -56,17 +50,7 @@ namespace Pruner.Host.Controllers
         [HttpPost]
         public async Task<BaseMessage> AddAsync([FromBody] DsDeleteFileConfigForm form)
         {
-            var msg = new BaseMessage();
-            if (form == null || string.IsNullOrEmpty(form.Path))
-                return msg.Fail(BaseErrType.InvalidParameter, "目录路径不能为空");
-
-            var entity = _mapper.Map<DsDeleteFileConfig>(form);
-            entity.Id = 0;
-            var count = await _repository.AddAsync(entity);
-            if (count > 0)
-                return BaseMessage.Success("新增成功", entity);
-
-            return msg.Fail("新增失败");
+            return await _service.AddAsync(form);
         }
 
         /// <summary>
@@ -75,20 +59,7 @@ namespace Pruner.Host.Controllers
         [HttpPut("{id}")]
         public async Task<BaseMessage> UpdateAsync(int id, [FromBody] DsDeleteFileConfigForm form)
         {
-            var msg = new BaseMessage();
-            if (form == null || form.Id != id)
-                return msg.Fail(BaseErrType.InvalidParameter, "参数无效");
-
-            var exists = await _repository.FindAsync(id);
-            if (exists == null)
-                return msg.Fail(BaseErrType.DataNotFound, "配置不存在");
-
-            _mapper.Map(form, exists);
-            var count = await _repository.UpdateAsync(exists);
-            if (count > 0)
-                return BaseMessage.Success("修改成功", exists);
-
-            return msg.Fail("修改失败");
+            return await _service.UpdateAsync(id, form);
         }
 
         /// <summary>
@@ -97,17 +68,7 @@ namespace Pruner.Host.Controllers
         [HttpPut("{id}/Enabled/{isEnabled}")]
         public async Task<BaseMessage> UpdateEnabledAsync(int id, bool isEnabled)
         {
-            var msg = new BaseMessage();
-            var exists = await _repository.FindAsync(id);
-            if (exists == null)
-                return msg.Fail(BaseErrType.DataNotFound, "配置不存在");
-
-            exists.IsEnabled = isEnabled;
-            var count = await _repository.UpdateAsync(exists);
-            if (count > 0)
-                return msg.Success(isEnabled ? "已启用" : "已禁用");
-
-            return msg.Fail("操作失败");
+            return await _service.UpdateEnabledAsync(id, isEnabled);
         }
 
         /// <summary>
@@ -116,16 +77,7 @@ namespace Pruner.Host.Controllers
         [HttpDelete("{id}")]
         public async Task<BaseMessage> DeleteAsync(int id)
         {
-            var msg = new BaseMessage();
-            var entity = await _repository.FindAsync(id);
-            if (entity == null)
-                return msg.Fail(BaseErrType.DataNotFound, "配置不存在");
-
-            var count = await _repository.DeleteAsync(entity);
-            if (count > 0)
-                return msg.Success("删除成功");
-
-            return msg.Fail("删除失败");
+            return await _service.DeleteAsync(id);
         }
     }
 }

@@ -10,7 +10,8 @@ namespace Pruner.Domain.Interfaces
         /// <summary>
         /// 执行数据删除任务
         /// </summary>
+        /// <param name="clientCode">客户端代码</param>
         /// <returns>删除的总记录数</returns>
-        Task<int> HandleDeleteAsync();
+        Task<int> HandleDeleteAsync(string clientCode);
     }
 }

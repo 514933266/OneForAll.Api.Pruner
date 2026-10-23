@@ -1,12 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OneForAll.Core;
-using Pruner.Domain.Interfaces;
-using Pruner.Host.Models;
-using Pruner.Host.QuartzJobs;
-using Pruner.HttpService.Interfaces;
+using Pruner.Application.Interfaces;
 using Pruner.Public.Models;
-using System;
 using System.Threading.Tasks;
 
 namespace Pruner.Host.Controllers
@@ -18,11 +14,15 @@ namespace Pruner.Host.Controllers
     [Authorize(Roles = UserRoleType.Admin)]
     public class MonitorDbDeleteController : Controller
     {
-        private readonly IMonitorDbDeleteManager _manager;
+        private readonly AuthConfig _authConfig;
+        private readonly IMonitorExecService _execService;
 
-        public MonitorDbDeleteController(IMonitorDbDeleteManager manager)
+        public MonitorDbDeleteController(
+            AuthConfig authConfig,
+            IMonitorExecService execService)
         {
-            _manager = manager;
+            _authConfig = authConfig;
+            _execService = execService;
         }
 
         /// <summary>
@@ -32,9 +32,8 @@ namespace Pruner.Host.Controllers
         [AllowAnonymous]
         public async Task<BaseMessage> ExecuteAsync()
         {
-            var msg = new BaseMessage();
-            var result = await _manager.HandleDeleteAsync();
-            return msg.Success($"数据维护删除任务执行完成，共删除{result}条数据");
+            var result = await _execService.HandleDbDeleteAsync(_authConfig.ClientCode);
+            return new BaseMessage().Success(result.Message);
         }
     }
 }
